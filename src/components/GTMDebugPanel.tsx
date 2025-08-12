@@ -5,9 +5,7 @@ import * as gtm from "@/lib/gtm";
 
 export default function GTMDebugPanel() {
   const [isVisible, setIsVisible] = useState(false);
-  const [dataLayerEvents, setDataLayerEvents] = useState<
-    Record<string, unknown>[]
-  >([]);
+  const [dataLayerEvents, setDataLayerEvents] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   useEffect(() => {
     // Only show in development
@@ -21,9 +19,10 @@ export default function GTMDebugPanel() {
 
     if (debugMode) {
       // Monitor dataLayer changes
-      const originalPush = window.dataLayer?.push;
+      const originalPush = (window as any).dataLayer?.push; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (originalPush) {
-        window.dataLayer.push = function (...args: Record<string, unknown>[]) {
+        (window as any).dataLayer.push = function (...args: any[]) {
+          // eslint-disable-line @typescript-eslint/no-explicit-any
           setDataLayerEvents((prev) => [...prev.slice(-9), ...args]); // Keep last 10 events
           return originalPush.apply(this, args);
         };
@@ -155,7 +154,7 @@ export default function GTMDebugPanel() {
                       className="bg-gray-50 p-2 rounded border text-xs"
                     >
                       <div className="font-mono">
-                        <strong>Event:</strong> {event.event || "N/A"}
+                        <strong>Event:</strong> {String(event.event) || "N/A"}
                       </div>
                       {event.ecommerce && (
                         <div className="font-mono text-green-700">

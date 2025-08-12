@@ -51,7 +51,10 @@ interface ShopifyOrder {
 function shopifyOrderToGTM(order: ShopifyOrder): gtm.GTMPurchaseData {
   const items: gtm.GTMProduct[] = order.line_items.map(
     (item, index: number) => ({
-      item_id: item.variant_id?.toString() || item.product_id?.toString(),
+      item_id:
+        item.variant_id?.toString() ||
+        item.product_id?.toString() ||
+        `unknown-${index}`,
       item_name: item.name,
       category: item.product_type || "clothing",
       item_brand: item.vendor || "juneof",
