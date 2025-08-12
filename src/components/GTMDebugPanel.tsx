@@ -3,9 +3,15 @@
 import { useState, useEffect } from "react";
 import * as gtm from "@/lib/gtm";
 
+type DebugEvent = {
+  event?: unknown;
+  ecommerce?: unknown;
+  [key: string]: unknown;
+};
+
 export default function GTMDebugPanel() {
   const [isVisible, setIsVisible] = useState(false);
-  const [dataLayerEvents, setDataLayerEvents] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [dataLayerEvents, setDataLayerEvents] = useState<DebugEvent[]>([]);
 
   useEffect(() => {
     // Only show in development
@@ -18,14 +24,15 @@ export default function GTMDebugPanel() {
     setIsVisible(debugMode);
 
     if (debugMode) {
-      // Monitor dataLayer changes
-      const originalPush = (window as any).dataLayer?.push; // eslint-disable-line @typescript-eslint/no-explicit-any
-      if (originalPush) {
-        (window as any).dataLayer.push = function (...args: any[]) {
-          // eslint-disable-line @typescript-eslint/no-explicit-any
+      // Monitor dataLayer changes with typed wrapper
+      const win = window as unknown as { dataLayer?: DebugEvent[] };
+      const dataLayer = win.dataLayer;
+      if (dataLayer && Array.isArray(dataLayer)) {
+        const originalPush = dataLayer.push.bind(dataLayer);
+        dataLayer.push = ((...args: DebugEvent[]) => {
           setDataLayerEvents((prev) => [...prev.slice(-9), ...args]); // Keep last 10 events
-          return originalPush.apply(this, args);
-        };
+          return originalPush(...args);
+        }) as typeof dataLayer.push;
       }
     }
   }, []);
