@@ -12,6 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface AddressCompletionStepProps {
   apiClient: CustomerAccountApiClient;
@@ -23,6 +30,45 @@ export function AddressCompletionStep({
   apiClient,
   onComplete,
 }: AddressCompletionStepProps) {
+  const INDIA_STATES = [
+    { code: "AN", name: "Andaman and Nicobar Islands" },
+    { code: "AP", name: "Andhra Pradesh" },
+    { code: "AR", name: "Arunachal Pradesh" },
+    { code: "AS", name: "Assam" },
+    { code: "BR", name: "Bihar" },
+    { code: "CH", name: "Chandigarh" },
+    { code: "CT", name: "Chhattisgarh" },
+    { code: "DD", name: "Daman and Diu" },
+    { code: "DL", name: "Delhi" },
+    { code: "DN", name: "Dadra and Nagar Haveli" },
+    { code: "GA", name: "Goa" },
+    { code: "GJ", name: "Gujarat" },
+    { code: "HP", name: "Himachal Pradesh" },
+    { code: "HR", name: "Haryana" },
+    { code: "JH", name: "Jharkhand" },
+    { code: "JK", name: "Jammu and Kashmir" },
+    { code: "KA", name: "Karnataka" },
+    { code: "KL", name: "Kerala" },
+    { code: "LA", name: "Ladakh" },
+    { code: "LD", name: "Lakshadweep" },
+    { code: "MH", name: "Maharashtra" },
+    { code: "ML", name: "Meghalaya" },
+    { code: "MN", name: "Manipur" },
+    { code: "MP", name: "Madhya Pradesh" },
+    { code: "MZ", name: "Mizoram" },
+    { code: "NL", name: "Nagaland" },
+    { code: "OR", name: "Odisha" },
+    { code: "PB", name: "Punjab" },
+    { code: "PY", name: "Puducherry" },
+    { code: "RJ", name: "Rajasthan" },
+    { code: "SK", name: "Sikkim" },
+    { code: "TG", name: "Telangana" },
+    { code: "TN", name: "Tamil Nadu" },
+    { code: "TR", name: "Tripura" },
+    { code: "UP", name: "Uttar Pradesh" },
+    { code: "UT", name: "Uttarakhand" },
+    { code: "WB", name: "West Bengal" },
+  ];
   const [formData, setFormData] = useState({
     phoneNumber: "",
     address1: "",
@@ -52,17 +98,17 @@ export function AddressCompletionStep({
       address1: formData.address1,
       address2: formData.address2,
       city: formData.city,
-      territoryCode: formData.province,
+      territoryCode: "IN", // Always India
       zip: formData.zip,
-      zoneCode: "IN", // Always India
+      zoneCode: formData.province, // 2-letter state/UT code
     });
 
     if (!addressValidation.isValid) {
       // Map API field names back to form field names
       const mappedErrors = { ...addressValidation.errors };
-      if (mappedErrors.territoryCode) {
-        mappedErrors.province = mappedErrors.territoryCode;
-        delete mappedErrors.territoryCode;
+      if (mappedErrors.zoneCode) {
+        mappedErrors.province = mappedErrors.zoneCode;
+        delete mappedErrors.zoneCode;
       }
       Object.assign(newErrors, mappedErrors);
     }
@@ -231,18 +277,27 @@ export function AddressCompletionStep({
           >
             state
           </Label>
-          <Input
-            id="province"
-            type="text"
+          <Select
             value={formData.province}
-            onChange={(e) => handleInputChange("province", e.target.value)}
-            placeholder="state"
-            className={`bg-white border-gray-300 text-black placeholder:text-gray-500 focus:border-black focus:ring-black/20 h-10 text-sm ${
-              errors.province ? "border-red-500" : ""
-            }`}
-            required
+            onValueChange={(value) => handleInputChange("province", value)}
             disabled={isSubmitting}
-          />
+          >
+            <SelectTrigger
+              id="province"
+              className={`bg-white border-gray-300 text-black focus:border-black focus:ring-black/20 h-10 text-sm w-full ${
+                errors.province ? "border-red-500" : ""
+              }`}
+            >
+              <SelectValue placeholder="select state / union territory" />
+            </SelectTrigger>
+            <SelectContent>
+              {INDIA_STATES.map((s) => (
+                <SelectItem key={s.code} value={s.code}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {errors.province && (
             <p className="text-sm text-red-600">{errors.province}</p>
           )}
