@@ -2,6 +2,7 @@ import { Old_Standard_TT } from "next/font/google";
 import "./globals.css";
 import type { Metadata } from "next";
 import Script from "next/script"; // Import next/script
+import { GoogleTagManager } from "@next/third-parties/google";
 import { organizationSchema } from "@/lib/seo";
 
 import { SplashProvider } from "@/context/SplashContext";
@@ -12,6 +13,7 @@ import { CartProvider } from "@/context/CartContext";
 import { AddressProvider } from "@/context/AddressContext";
 import ClientLayout from "@/app/components/ClientLayout";
 import LenisProvider from "@/components/LenisProvider";
+import GTMDebugPanel from "@/components/GTMDebugPanel";
 
 const oldStandardTT = Old_Standard_TT({
   weight: ["400", "700"],
@@ -135,6 +137,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+  const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
 
   return (
     <html lang="en">
@@ -156,20 +159,6 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#ffffff" />
         <meta name="theme-color" content="#ffffff" />
         <link rel="manifest" href="/site.webmanifest" />
-
-        {/* Google Analytics 4 (GA4) */}
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-ES618WEEFG"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-ES618WEEFG');
-          `}
-        </Script>
 
         {/* Meta Pixel Script */}
         {PIXEL_ID && (
@@ -226,6 +215,10 @@ export default function RootLayout({
             </SplashProvider>
           </LoadingProvider>
         </LenisProvider>
+        {/* Google Tag Manager */}
+        {GTM_ID && <GoogleTagManager gtmId={GTM_ID} />}
+        {/* GTM Debug Panel (development only) */}
+        <GTMDebugPanel />
       </body>
     </html>
   );

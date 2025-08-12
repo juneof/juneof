@@ -11,6 +11,7 @@ import React, {
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/context/LoadingContext";
 import type { CheckoutLoginContext } from "@/context/CartContext";
+import * as gtm from "@/lib/gtm";
 
 import {
   getTokensUnified,
@@ -323,6 +324,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             "AuthContext: _internal - Customer data set",
             response.data
           );
+
+          // Track GTM login event and set user ID
+          const customerId = response.data.customer?.id;
+          const customerEmail =
+            response.data.customer?.emailAddress?.emailAddress;
+
+          if (customerId) {
+            gtm.setUserId(customerId);
+            gtm.trackLogin("shopify", customerId);
+
+            // Set user properties for better tracking
+            gtm.setUserProperties({
+              customer_id: customerId,
+              preferred_language: "en",
+              // Add more properties as needed
+            });
+          }
         } else {
           setCustomerData(null);
           console.warn(

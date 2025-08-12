@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useAuth } from "./AuthContext";
 import { useAddress } from "./AddressContext";
 import * as pixel from "@/lib/meta-pixel"; // Import the pixel helper
+import * as gtm from "@/lib/gtm"; // Import GTM helper
 
 export interface CartItem {
   id: string; // Unique ID for the cart item (e.g., productID + size)
@@ -246,7 +247,7 @@ export const CartProvider = ({ children }: CartProviderProps) => {
       isProcessingAuthChange.current = false;
       authChangeTimeoutRef.current = null;
     }, 100); // 100ms debounce for auth changes
-  }, [isAuthenticated]); // Removed isCartOverlayOpen dependency to prevent cascade during cart operations
+  }, [isAuthenticated, cartItems.length, isCartOverlayOpen]); // Added missing dependencies
 
   // Save cart to localStorage for guest users
   useEffect(() => {
@@ -338,6 +339,26 @@ export const CartProvider = ({ children }: CartProviderProps) => {
       }
     });
 
+    // Track GTM add to cart event
+    const eventData = {
+      event: "add_to_cart",
+      ecommerce: {
+        currency: "INR", // Assuming INR
+        value: newItemData.price,
+        items: [
+          {
+            item_id: newItemData.variantId,
+            item_name: newItemData.name,
+            item_brand: "June Of",
+            item_variant: newItemData.size,
+            price: newItemData.price,
+            quantity: 1,
+          },
+        ],
+      },
+    };
+    gtm.sendGTMEvent(eventData);
+
     // Show toast notification for adding item to cart
     toast.success("Added to bag", {
       description: `${newItemData.name} (${newItemData.size}) added to your bag`,
@@ -350,6 +371,25 @@ export const CartProvider = ({ children }: CartProviderProps) => {
     const itemToRemove = cartItems.find((item) => item.id === itemId);
 
     setCartItems((prevItems) => prevItems.filter((item) => item.id !== itemId));
+
+    // Track GTM remove from cart event
+    if (itemToRemove) {
+      const gtmProduct: gtm.GTMProduct = {
+        item_id: itemToRemove.variantId || itemToRemove.id,
+        item_name: itemToRemove.name,
+        category: "clothing",
+        item_brand: "juneof",
+        item_variant: itemToRemove.size,
+        price: itemToRemove.price,
+        currency: "INR",
+        quantity: itemToRemove.quantity,
+      };
+
+      gtm.trackRemoveFromCart(
+        [gtmProduct],
+        itemToRemove.price * itemToRemove.quantity
+      );
+    }
 
     // Show toast notification for removing item
     if (itemToRemove) {
@@ -525,6 +565,31 @@ export const CartProvider = ({ children }: CartProviderProps) => {
           currency: "INR", // Assuming INR
           value: subtotal,
         });
+      }
+
+      // Track GTM begin checkout event
+      if (cartItems.length > 0) {
+        const subtotal = cartItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        );
+
+        const eventData = {
+          event: "begin_checkout",
+          ecommerce: {
+            currency: "INR",
+            value: subtotal,
+            items: cartItems.map((item) => ({
+              item_id: item.variantId,
+              item_name: item.name,
+              item_brand: "June Of",
+              item_variant: item.size,
+              price: item.price,
+              quantity: item.quantity,
+            })),
+          },
+        };
+        gtm.sendGTMEvent(eventData);
       }
 
       await createCartAndRedirect(

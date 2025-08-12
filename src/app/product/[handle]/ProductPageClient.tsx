@@ -13,6 +13,7 @@ import { useProfileCompletion } from "@/hooks/useProfileCompletion";
 import { ProductWithGuides } from "@/lib/sanity-queries";
 import { generateProductSchema } from "@/lib/seo";
 import * as pixel from "@/lib/meta-pixel"; // Import the pixel helper
+import * as gtm from "@/lib/gtm"; // Import GTM helper
 import { toast } from "sonner";
 // NEW 2025-07 API imports
 import {
@@ -134,6 +135,28 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
         currency: product.priceRange.minVariantPrice.currencyCode,
         value: parseFloat(product.priceRange.minVariantPrice.amount),
       });
+    }
+
+    // Track GTM view item event
+    if (product) {
+      const eventData = {
+        event: "view_item",
+        ecommerce: {
+          currency: product.priceRange.minVariantPrice.currencyCode,
+          value: parseFloat(product.priceRange.minVariantPrice.amount),
+          items: [
+            {
+              item_id: product.id,
+              item_name: product.title,
+              item_brand: "June Of",
+              item_category: product.productType,
+              price: parseFloat(product.priceRange.minVariantPrice.amount),
+              quantity: 1,
+            },
+          ],
+        },
+      };
+      gtm.sendGTMEvent(eventData);
     }
   }, [product]);
 
@@ -398,6 +421,9 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
             data.message ||
               "thank you! you're first in line now! we'll keep you posted."
           );
+
+          // Track GTM express interest event
+          gtm.trackExpressInterest(product.id, product.title, email);
         } else {
           console.error("Express Interest: Error for authenticated user", data);
           setExpressInterestMessage(

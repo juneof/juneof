@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useProfileCompletion } from "@/hooks/useProfileCompletion";
 import AddressSelectionOverlay from "./AddressSelectionOverlay";
 import { ShoppingBagIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import * as gtm from "@/lib/gtm";
 
 // Simple price formatter for Rupees (consistent with ProductCard)
 const formatPrice = (price: number): string => {
@@ -99,6 +100,25 @@ export default function CartOverlay() {
     tl.current?.kill();
 
     if (isCartOverlayOpen && !isAnimatingOut) {
+      // Track GTM view cart event when overlay opens
+      if (cartItems.length > 0) {
+        const gtmItems: gtm.GTMProduct[] = cartItems.map((item) => ({
+          item_id: item.variantId || item.id,
+          item_name: item.name,
+          category: "clothing",
+          item_brand: "juneof",
+          item_variant: item.size,
+          price: item.price,
+          currency: "INR",
+          quantity: item.quantity,
+        }));
+
+        const total = cartItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        );
+        gtm.trackViewCart(gtmItems, total, "INR");
+      }
       gsap.set(overlayElement, { autoAlpha: 1 });
       gsap.set(contentElement, { x: "100%", opacity: 0 }); // Start off-screen right
       gsap.set(backdropElement, { opacity: 0 });
