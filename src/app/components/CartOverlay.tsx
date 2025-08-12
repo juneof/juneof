@@ -169,7 +169,7 @@ export default function CartOverlay() {
     return () => {
       tl.current?.kill();
     };
-  }, [isCartOverlayOpen, isAnimatingOut, closeCartOverlay]);
+  }, [isCartOverlayOpen, isAnimatingOut, closeCartOverlay, cartItems]);
 
   const handleQuantityChange = (itemId: string, change: number) => {
     updateItemQuantity(itemId, change);

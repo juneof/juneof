@@ -399,7 +399,7 @@ export default function CustomerOrders({
       hasFetchedRef.current = false;
       setOrders([]);
     }
-  }, [tokens, loadTokensAndFetchOrders]);
+  }, [tokens, loadTokensAndFetchOrders, orders.length]);
 
   // Helper functions
   const formatPrice = (amount: string, currencyCode: string): string => {

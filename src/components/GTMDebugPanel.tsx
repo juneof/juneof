@@ -5,7 +5,9 @@ import * as gtm from "@/lib/gtm";
 
 export default function GTMDebugPanel() {
   const [isVisible, setIsVisible] = useState(false);
-  const [dataLayerEvents, setDataLayerEvents] = useState<any[]>([]);
+  const [dataLayerEvents, setDataLayerEvents] = useState<
+    Record<string, unknown>[]
+  >([]);
 
   useEffect(() => {
     // Only show in development
@@ -21,7 +23,7 @@ export default function GTMDebugPanel() {
       // Monitor dataLayer changes
       const originalPush = window.dataLayer?.push;
       if (originalPush) {
-        window.dataLayer.push = function (...args: any[]) {
+        window.dataLayer.push = function (...args: Record<string, unknown>[]) {
           setDataLayerEvents((prev) => [...prev.slice(-9), ...args]); // Keep last 10 events
           return originalPush.apply(this, args);
         };

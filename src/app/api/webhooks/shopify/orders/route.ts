@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import * as gtm from "@/lib/gtm";
 
 // Shopify webhook verification
-function verifyShopifyWebhook(body: string, signature: string): boolean {
+async function verifyShopifyWebhook(
+  body: string,
+  signature: string
+): Promise<boolean> {
   const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
@@ -10,7 +13,7 @@ function verifyShopifyWebhook(body: string, signature: string): boolean {
     return false;
   }
 
-  const crypto = require("crypto");
+  const crypto = await import("crypto");
   const hmac = crypto.createHmac("sha256", webhookSecret);
   hmac.update(body, "utf8");
   const computedSignature = hmac.digest("base64");
@@ -21,10 +24,33 @@ function verifyShopifyWebhook(body: string, signature: string): boolean {
   );
 }
 
+// Shopify order type
+interface ShopifyOrder {
+  order_number?: string;
+  id: string;
+  total_price: string;
+  currency?: string;
+  total_tax?: string;
+  shipping_lines?: Array<{ price?: string }>;
+  discount_codes?: Array<{ code: string }>;
+  line_items: Array<{
+    variant_id?: string;
+    product_id?: string;
+    name: string;
+    product_type?: string;
+    vendor?: string;
+    variant_title?: string;
+    price: string;
+    quantity: number;
+  }>;
+  cancel_reason?: string;
+  refunds?: Array<{ amount?: string }>;
+}
+
 // Convert Shopify order to GTM format
-function shopifyOrderToGTM(order: any): gtm.GTMPurchaseData {
+function shopifyOrderToGTM(order: ShopifyOrder): gtm.GTMPurchaseData {
   const items: gtm.GTMProduct[] = order.line_items.map(
-    (item: any, index: number) => ({
+    (item, index: number) => ({
       item_id: item.variant_id?.toString() || item.product_id?.toString(),
       item_name: item.name,
       category: item.product_type || "clothing",
@@ -59,12 +85,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify webhook authenticity
-    if (!verifyShopifyWebhook(body, signature)) {
+    if (!(await verifyShopifyWebhook(body, signature))) {
       console.error("Invalid Shopify webhook signature");
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
-    const order = JSON.parse(body);
+    const order = JSON.parse(body) as ShopifyOrder;
     const topic = request.headers.get("x-shopify-topic");
 
     console.log(
