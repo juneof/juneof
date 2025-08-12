@@ -1,12 +1,17 @@
 // Google Tag Manager utility functions for e-commerce tracking
 // This follows Google Analytics 4 Enhanced Ecommerce specification
 
-// Note: dataLayer is declared by GTM, so we don't redeclare it here
+// Local helper type for accessing the GTM dataLayer without polluting the global Window type
+interface DataLayerWindow {
+  dataLayer: Array<Record<string, unknown>>;
+}
 
 // Initialize dataLayer if it doesn't exist
-if (typeof window !== "undefined" && !(window as any).dataLayer) {
-  // eslint-disable-line @typescript-eslint/no-explicit-any
-  (window as any).dataLayer = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+if (typeof window !== "undefined") {
+  const w = window as unknown as Partial<DataLayerWindow>;
+  if (!w.dataLayer) {
+    (window as unknown as DataLayerWindow).dataLayer = [];
+  }
 }
 
 // GTM Event Types
@@ -51,12 +56,13 @@ export interface GTMUser {
 }
 
 // Core GTM function to push events to dataLayer
-export const pushToDataLayer = (event: Record<string, any>) => {
-  // eslint-disable-line @typescript-eslint/no-explicit-any
-  if (typeof window !== "undefined" && (window as any).dataLayer) {
-    // eslint-disable-line @typescript-eslint/no-explicit-any
-    console.log("GTM Event:", event); // Debug logging
-    (window as any).dataLayer.push(event); // eslint-disable-line @typescript-eslint/no-explicit-any
+export const pushToDataLayer = (event: GTMEvent | Record<string, unknown>) => {
+  if (typeof window !== "undefined") {
+    const w = window as unknown as DataLayerWindow;
+    if (Array.isArray(w.dataLayer)) {
+      console.log("GTM Event:", event); // Debug logging
+      w.dataLayer.push(event);
+    }
   }
 };
 
@@ -64,17 +70,19 @@ export const pushToDataLayer = (event: Record<string, any>) => {
 export type GTMEvent = {
   event: string;
   ecommerce: {
-    [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    [key: string]: unknown;
   };
 };
 
 // Helper function to send GTM events with ecommerce data
 export const sendGTMEvent = (data: GTMEvent) => {
-  if (typeof window !== "undefined" && (window as any).dataLayer) {
-    // eslint-disable-line @typescript-eslint/no-explicit-any
-    (window as any).dataLayer.push({ ecommerce: null }); // eslint-disable-line @typescript-eslint/no-explicit-any
-    (window as any).dataLayer.push(data); // eslint-disable-line @typescript-eslint/no-explicit-any
-    console.log("GTM E-commerce Event:", data); // Debug logging
+  if (typeof window !== "undefined") {
+    const w = window as unknown as DataLayerWindow;
+    if (Array.isArray(w.dataLayer)) {
+      w.dataLayer.push({ ecommerce: null }); // Clear previous ecommerce object
+      w.dataLayer.push(data);
+      console.log("GTM E-commerce Event:", data); // Debug logging
+    }
   }
 };
 
@@ -472,16 +480,14 @@ export const shopifyCartToGTM = (shopifyCart: {
 
 // Debug function to check if GTM is loaded
 export const isGTMLoaded = (): boolean => {
-  return (
-    typeof window !== "undefined" && Array.isArray((window as any).dataLayer)
-  ); // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (typeof window === "undefined") return false;
+  const w = window as unknown as Partial<DataLayerWindow>;
+  return Array.isArray(w.dataLayer);
 };
 
 // Get current dataLayer state (for debugging)
-export const getDataLayerState = () => {
-  if (typeof window !== "undefined" && (window as any).dataLayer) {
-    // eslint-disable-line @typescript-eslint/no-explicit-any
-    return (window as any).dataLayer; // eslint-disable-line @typescript-eslint/no-explicit-any
-  }
-  return [];
+export const getDataLayerState = (): Array<Record<string, unknown>> => {
+  if (typeof window === "undefined") return [];
+  const w = window as unknown as Partial<DataLayerWindow>;
+  return (w.dataLayer as Array<Record<string, unknown>>) || [];
 };
