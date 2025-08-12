@@ -327,8 +327,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           // Track GTM login event and set user ID
           const customerId = response.data.customer?.id;
-          const customerEmail =
-            response.data.customer?.emailAddress?.emailAddress;
 
           if (customerId) {
             gtm.setUserId(customerId);

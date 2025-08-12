@@ -3,8 +3,8 @@
 
 declare global {
   interface Window {
-    dataLayer: any[];
-    gtag?: (...args: any[]) => void;
+    dataLayer: Record<string, unknown>[];
+    gtag?: (...args: unknown[]) => void;
   }
 }
 
@@ -50,12 +50,12 @@ export interface GTMUser {
     customer_lifetime_value?: number;
     customer_loyalty_tier?: string;
     preferred_language?: string;
-    [key: string]: any;
+    [key: string]: string | number | boolean | undefined;
   };
 }
 
 // Core GTM function to push events to dataLayer
-export const pushToDataLayer = (event: Record<string, any>) => {
+export const pushToDataLayer = (event: Record<string, unknown>) => {
   if (typeof window !== "undefined" && window.dataLayer) {
     console.log("GTM Event:", event); // Debug logging
     window.dataLayer.push(event);
@@ -66,7 +66,7 @@ export const pushToDataLayer = (event: Record<string, any>) => {
 export type GTMEvent = {
   event: string;
   ecommerce: {
-    [key: string]: any;
+    [key: string]: unknown;
   };
 };
 
@@ -400,8 +400,25 @@ export const trackContactForm = (formType: string, email?: string) => {
 
 // Convert Shopify product to GTM format
 export const shopifyProductToGTM = (
-  shopifyProduct: any,
-  selectedVariant?: any,
+  shopifyProduct: {
+    id: string;
+    title: string;
+    productType?: string;
+    vendor?: string;
+    variants?: Array<{
+      id: string;
+      title: string;
+      price: { amount: string; currencyCode: string };
+    }>;
+    priceRange?: {
+      minVariantPrice: { amount: string; currencyCode?: string };
+    };
+  },
+  selectedVariant?: {
+    id: string;
+    title: string;
+    price: { amount: string; currencyCode: string };
+  },
   quantity = 1
 ): GTMProduct => {
   const variant = selectedVariant || shopifyProduct.variants?.[0];
@@ -423,9 +440,25 @@ export const shopifyProductToGTM = (
 };
 
 // Convert Shopify cart to GTM format
-export const shopifyCartToGTM = (shopifyCart: any): GTMProduct[] => {
+export const shopifyCartToGTM = (shopifyCart: {
+  lines?: {
+    nodes?: Array<{
+      merchandise: {
+        id: string;
+        title: string;
+        price: { amount: string; currencyCode: string };
+        product: {
+          title: string;
+          productType?: string;
+          vendor?: string;
+        };
+      };
+      quantity: number;
+    }>;
+  };
+}): GTMProduct[] => {
   return (
-    shopifyCart.lines?.nodes?.map((line: any) => ({
+    shopifyCart.lines?.nodes?.map((line) => ({
       item_id: line.merchandise.id,
       item_name: line.merchandise.product.title,
       category: line.merchandise.product.productType,
