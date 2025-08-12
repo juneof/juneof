@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
         // Track partial or full refund
         const refundAmount =
           order.refunds?.reduce(
-            (sum: number, refund: any) =>
+            (sum: number, refund: { amount?: string }) =>
               sum + parseFloat(refund.amount || "0"),
             0
           ) || 0;
