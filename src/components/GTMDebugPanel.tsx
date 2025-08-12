@@ -163,7 +163,7 @@ export default function GTMDebugPanel() {
                       <div className="font-mono">
                         <strong>Event:</strong> {String(event.event) || "N/A"}
                       </div>
-                      {event.ecommerce && (
+                      {!!event.ecommerce && (
                         <div className="font-mono text-green-700">
                           <strong>Ecommerce:</strong>{" "}
                           {JSON.stringify(event.ecommerce, null, 1)}
