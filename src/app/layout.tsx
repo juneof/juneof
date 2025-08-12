@@ -112,7 +112,7 @@ export const metadata: Metadata = {
         url: "/landing-images/logo.svg",
         width: 1200,
         height: 630,
-        alt: "June Of Logo",
+        alt: "june of Logo",
       },
     ],
   },
