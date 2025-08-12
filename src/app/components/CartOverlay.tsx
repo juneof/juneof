@@ -226,6 +226,38 @@ export default function CartOverlay() {
         return;
       }
 
+      // Prepare GTM event data for begin_checkout
+      const gtmItems: gtm.GTMProduct[] = cartItems.map((item) => ({
+        item_id: item.variantId || item.id,
+        item_name: item.name,
+        category: "clothing",
+        item_brand: "juneof",
+        item_variant: item.size,
+        price: item.price,
+        currency: "INR",
+        quantity: item.quantity,
+      }));
+
+      const subtotalValue = cartItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
+
+      const eventData = {
+        event: "begin_checkout",
+        ecommerce: {
+          currency: "INR",
+          value: subtotalValue,
+          items: gtmItems,
+        },
+      };
+
+      // --- ADD THIS CONSOLE LOG ---
+      console.log("🔥 Firing begin_checkout event!", eventData);
+      // --- END OF ADDITION ---
+
+      gtm.sendGTMEvent(eventData);
+
       await proceedToCheckout();
       // Cart will be cleared automatically in proceedToCheckout
       // Close the cart overlay after successful checkout initiation
