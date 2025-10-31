@@ -706,6 +706,7 @@ export interface ShopifyProductDetails {
   handle: string;
   description: string;
   descriptionHtml: string;
+  availableForSale: boolean;
   priceRange: {
     minVariantPrice: ShopifyMoney;
     maxVariantPrice: ShopifyMoney;

@@ -22,6 +22,7 @@ import {
   getSizeAvailabilityStatus,
   type ShopifyProductVariant,
 } from "@/lib/shopify";
+import PreOrderModal from "@/components/common/pre-order-modal";
 
 // Mobile detection hook
 const useIsMobile = () => {
@@ -80,6 +81,7 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
     useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isProfileCompletionOpen, setIsProfileCompletionOpen] = useState(false);
+  const [isPreOrderOpen, setIsPreOrderOpen] = useState<boolean>(false);
 
   // Add state for dynamic express interest checking
   const [currentExpressInterest, setCurrentExpressInterest] = useState(
@@ -124,6 +126,12 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
       console.log("Selected variant:", variant);
     }
   }, [product, selectedSize]);
+
+  useEffect(() => {
+    if (product && product.availableForSale === false) {
+      setIsPreOrderOpen(true);
+    }
+  }, [product]);
 
   // Track ViewContent event when the product data is available
   useEffect(() => {
@@ -726,6 +734,16 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
             isProcessingCompletion.current = false;
           }}
         />
+
+        <PreOrderModal
+          isOpen={isPreOrderOpen}
+          onClose={() => setIsPreOrderOpen(false)}
+          product={{
+            id: product.id,
+            title: product.title,
+            handle: product.handle,
+          }}
+        />
       </>
     );
   }
@@ -980,6 +998,16 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
             duration: 4000,
           });
           isProcessingCompletion.current = false;
+        }}
+      />
+
+      <PreOrderModal
+        isOpen={isPreOrderOpen}
+        onClose={() => setIsPreOrderOpen(false)}
+        product={{
+          id: product.id,
+          title: product.title,
+          handle: product.handle,
         }}
       />
     </>

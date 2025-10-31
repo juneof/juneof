@@ -7,6 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 
 // Toggle for email section visibility
 const SHOW_EMAIL_SECTION = false;
@@ -148,7 +153,7 @@ const Footer = () => {
               )}
 
               {/* Column 2: Social/Shop */}
-              <div className="w-full sm:w-auto md:w-1/4 mb-6 md:mb-0 flex flex-col items-start md:items-center">
+              <div className="w-full sm:w-auto md:w-1/4 mb-6 md:mb-0 flex flex-col items-start gap-3">
                 <a
                   href="https://www.instagram.com/juneof__"
                   target="_blank"
@@ -159,6 +164,47 @@ const Footer = () => {
                   instagram
                 </a>
                 {/* Removed TikTok and Shop Lello */}
+                <div>
+                  <p className="mb-2">subscribe to us!</p>
+                  <InputGroup className="h-14 border border-black">
+                    <InputGroupInput
+                      id="preorder-email"
+                      name="email"
+                      placeholder="enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full rounded-md pr-20 !text-lg placeholder-gray-400"
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <button
+                        type="submit"
+                        className="bg-black text-white w-10 h-10 rounded-md flex items-center justify-center"
+                        aria-label="Submit"
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          aria-hidden
+                        >
+                          <path
+                            d="M5 12h14"
+                            stroke="white"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d="M12 5l7 7-7 7"
+                            stroke="white"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                    </InputGroupAddon>
+                  </InputGroup>
+                </div>
               </div>
 
               {/* Column 3: Legal */}
