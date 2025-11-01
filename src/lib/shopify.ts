@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { GraphQLClient } from "graphql-request";
 
 // Retrieve environment variables
@@ -707,6 +708,7 @@ export interface ShopifyProductDetails {
   description: string;
   descriptionHtml: string;
   availableForSale: boolean;
+  preOrderModal?: any;
   priceRange: {
     minVariantPrice: ShopifyMoney;
     maxVariantPrice: ShopifyMoney;

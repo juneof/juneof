@@ -1,14 +1,22 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import imageUrlBuilder from "@sanity/image-url";
+import { client as sanityClient } from "@/sanity/lib/client";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "../ui/input-group";
+import {
+  hasModalSessionShown,
+  isModalEligible,
+  markModalSessionShown,
+  persistModalDismiss,
+} from "@/lib/modal.client";
 
 interface PreOrderModalProps {
   isOpen: boolean;
@@ -17,21 +25,64 @@ interface PreOrderModalProps {
     id?: string;
     title?: string;
     handle?: string;
+    availableForSale?: boolean; // optional availability flag
   };
+  modalDetails?: any; // flexible shape from Sanity
+}
+
+// Sanity image builder helper
+const builder = imageUrlBuilder(sanityClient);
+function urlFor(source: any): string | null {
+  if (!source) return null;
+  try {
+    if (source?.asset?._ref || source?.asset?._id || source?._ref) {
+      return builder.image(source).url();
+    }
+    if (
+      typeof source === "string" &&
+      (source.startsWith("http") || source.startsWith("/"))
+    ) {
+      return source;
+    }
+    if (source?.asset?.url) {
+      return source.asset.url;
+    }
+    return builder.image(source).url();
+  } catch (err) {
+    console.warn("urlFor: could not build image url for source:", source, err);
+    return null;
+  }
 }
 
 export default function PreOrderModal({
   isOpen,
   onClose,
   product,
+  modalDetails,
 }: PreOrderModalProps) {
   const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
-  // lock body scroll while open
+  // responsive detection
+  useEffect(() => {
+    if (!mounted) return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    if (mq.addEventListener) {
+      mq.addEventListener("change", update);
+      return () => mq.removeEventListener("change", update);
+    } else {
+      mq.addListener(update);
+      return () => mq.removeListener(update);
+    }
+  }, [mounted]);
+
+  // body scroll lock
   useEffect(() => {
     if (!mounted) return;
     const original = document.body.style.overflow;
@@ -49,10 +100,11 @@ export default function PreOrderModal({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
-        onClose();
+        handleClose();
       }
     },
-    [isOpen, onClose]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isOpen]
   );
 
   useEffect(() => {
@@ -60,6 +112,97 @@ export default function PreOrderModal({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [mounted, handleKeyDown]);
+
+  // Defensive: if modalDetails absent, don't render
+  if (!modalDetails) return null;
+
+  // Session logic: if feature enabled and session key present — never render
+  if (typeof window !== "undefined" && modalDetails?.showOncePerSession) {
+    try {
+      if (hasModalSessionShown(modalDetails)) return null;
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  // Defensive client-side eligibility check
+  const productHandle = product?.handle || "";
+  const productAvailable =
+    typeof product?.availableForSale === "boolean"
+      ? product.availableForSale
+      : undefined;
+  const clientEligible = isModalEligible({
+    modal: modalDetails,
+    productHandle,
+    productAvailable,
+  });
+  if (!clientEligible) {
+    return null;
+  }
+
+  // Extract modal fields with safe fallbacks
+  const heading =
+    modalDetails?.heading ||
+    modalDetails?.title ||
+    modalDetails?.modalName ||
+    "on pre-orders only!";
+  const subHeading = modalDetails?.subHeading || "";
+  const introText =
+    modalDetails?.introText ||
+    "Need time? We're more than happy to spill all the tea";
+  const inputPlaceholder = modalDetails?.inputPlaceholder || "drop your email";
+  const consentText =
+    modalDetails?.consentText ||
+    "By completing this form, you are signing up to receive our emails and can unsubscribe anytime.";
+  const consentSubText =
+    modalDetails?.consentSubText || "(But it won't spam you)";
+  const ctaText = modalDetails?.ctaText || "keep me posted";
+  const discountPercent =
+    typeof modalDetails?.discountPercent === "number"
+      ? modalDetails.discountPercent
+      : undefined;
+  const backgroundColor =
+    modalDetails?.appearance?.background?.color || "#F2EDD8";
+  const textColorTitle =
+    modalDetails?.appearance?.textColors?.title || "#111827";
+  const textColorBody = modalDetails?.appearance?.textColors?.body || "#111827";
+  const ctaBackground =
+    modalDetails?.appearance?.textColors?.ctaBackground || "#000";
+  const ctaTextColor = modalDetails?.appearance?.textColors?.ctaText || "#fff";
+  const productSpecificMessage = modalDetails?.productSpecificMessage || "";
+
+  // Build image URLs
+  const desktopImageSrc = urlFor(
+    modalDetails?.appearance?.background?.desktopImage
+  );
+  const mobileImageSrc = urlFor(
+    modalDetails?.appearance?.background?.mobileImage
+  );
+  const bgImageUrl = isMobile
+    ? mobileImageSrc || desktopImageSrc
+    : desktopImageSrc || mobileImageSrc;
+
+  const discountBlock =
+    discountPercent && discountPercent > 0 ? (
+      <span className="px-3 mr-3 -ml-3 text-4xl md:text-7xl font-bold tracking-widest">
+        {discountPercent}% off
+      </span>
+    ) : null;
+
+  // mark session shown helper (uses modalDetails suffix or id)
+  const markSessionShown = () => {
+    try {
+      markModalSessionShown(modalDetails);
+    } catch {
+      // ignore
+    }
+  };
+
+  // handle close - mark session and call onClose
+  const handleClose = () => {
+    markSessionShown();
+    onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +233,14 @@ export default function PreOrderModal({
         data?.message || "Thanks — we'll notify you when it's back!"
       );
       setEmail("");
+
+      // persist dismissal (localStorage) if configured
+      try {
+        persistModalDismiss(modalDetails);
+      } catch {}
+
+      // mark session on successful submit and close
+      markSessionShown();
       onClose();
     } catch (err) {
       console.error("PreOrder submit error:", err);
@@ -102,12 +253,13 @@ export default function PreOrderModal({
   if (!mounted) return null;
   if (!isOpen) return null;
 
+  // Render modal
   const modal = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/45"
-        onClick={() => onClose()}
+        onClick={() => handleClose()}
         aria-hidden
       />
 
@@ -116,107 +268,139 @@ export default function PreOrderModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Notify me when ${product?.title || "this product"} is available`}
-        className="relative z-10 w-full max-w-[876px] min-h-[490px] bg-white p-8 md:p-14 shadow-2xl overflow-hidden"
+        className="relative z-10 w-full max-w-[876px] min-h-[490px] shadow-2xl overflow-hidden flex flex-col justify-between p-8 md:p-14"
+        style={{
+          backgroundColor: !bgImageUrl ? backgroundColor : undefined,
+          color: textColorBody,
+        }}
       >
-        {/* close (forced to the top-right) */}
-        {/* Note: we explicitly set left: 'auto' via inline style to override any left-based overrides (e.g., older classes or logical properties). */}
+        {/* Background image layer (absolute) */}
+        {bgImageUrl && (
+          <div
+            className="absolute inset-0 bg-center bg-cover pointer-events-none"
+            style={{
+              backgroundImage: `url("${bgImageUrl}")`,
+              zIndex: 0,
+            }}
+            aria-hidden
+          />
+        )}
+
+        {/* Optional overlay for readability (uses overlayOpacity if provided) */}
+        {bgImageUrl && (
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                typeof modalDetails?.appearance?.background?.overlayOpacity ===
+                "number"
+                  ? `rgba(0,0,0,${modalDetails.appearance.background.overlayOpacity})`
+                  : "transparent",
+              zIndex: 1,
+            }}
+            aria-hidden
+          />
+        )}
+
+        {/* Close */}
         <button
           aria-label="Close"
-          onClick={() => onClose()}
-          className="!absolute !top-4 !right-4 z-20 w-9 h-9 flex items-center justify-center hover:bg-gray-100 transition"
+          onClick={() => handleClose()}
+          className="!absolute !top-4 !right-4 z-30 w-9 h-9 flex items-center justify-center hover:bg-gray-100 transition"
           style={{ left: "auto" }}
         >
           <span className="relative block w-5 h-[2px] bg-black rotate-45" />
           <span className="absolute block w-5 h-[2px] bg-black -rotate-45" />
         </button>
 
-        {/* decorative svgs (kept subtle) */}
-        <svg
-          className="absolute left-0 top-0 opacity-90 pointer-events-none"
-          width="238"
-          height="298"
-          viewBox="0 0 238 298"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M-99 297C-99 297 -68.8457 198.034 -40 161.89C10.1356 99.0682 54.2716 210.657 107.5 161.89C157.91 115.705 158.509 -3.48482 208.5 -51.8507C219.309 -62.3083 237 -74 237 -74"
-            stroke="black"
-          />
-        </svg>
-        <svg
-          className="absolute right-0 bottom-0 opacity-90 pointer-events-none"
-          width="479"
-          height="257"
-          viewBox="0 0 479 257"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M96.5506 173.808C49.5905 200.337 0.5 272.975 0.5 272.975V291.671H547.5V0.670654C547.5 0.670654 518.699 9.25204 501.103 16.9276C419.718 52.427 418.743 139.909 336.677 173.808C250.023 209.601 178.17 127.698 96.5506 173.808Z"
-            stroke="black"
-            stroke-opacity="0.7"
-          />
-        </svg>
-
         {/* Content */}
-        <div className="text-center absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full">
-          <h2 className="font-serif text-3xl md:text-4xl leading-tight text-[#111827]">
-            <span className="inline-block bg-[#f9f6f0] px-3 mr-3 -ml-1 md:text-5xl">
-              Be the first
-            </span>
-            to know when this
-            <br />
-            product is available
-          </h2>
+        <div className="relative z-40 w-full flex flex-col items-center md:items-start space-y-4 mt-5">
+          {!bgImageUrl && (
+            <h2
+              className="text-3xl md:text-4xl leading-tight font-bold flex items-center"
+              style={{ color: textColorTitle }}
+            >
+              {discountBlock}
+              <span className="text-3xl md:text-4xl font-bold">{heading}</span>
+            </h2>
+          )}
 
-          <form onSubmit={handleSubmit} className="mt-8">
-            <div className="max-w-sm mx-auto px-4">
-              <Label htmlFor="preorder-email" className="sr-only">
-                Email
-              </Label>
-              <InputGroup className="h-14 border border-black">
-                <InputGroupInput
-                  id="preorder-email"
-                  name="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-md pr-20 !text-lg placeholder-gray-400"
-                />
-                <InputGroupAddon align="inline-end">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="bg-black text-white w-10 h-10 rounded-md flex items-center justify-center"
-                    aria-label="Submit"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      aria-hidden
-                    >
-                      <path
-                        d="M5 12h14"
-                        stroke="white"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                      <path
-                        d="M12 5l7 7-7 7"
-                        stroke="white"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
-                </InputGroupAddon>
-              </InputGroup>
-            </div>
-          </form>
+          {!bgImageUrl && subHeading && (
+            <p
+              className="text-lg md:text-xl leading-tight font-bold"
+              style={{ color: textColorBody }}
+              dangerouslySetInnerHTML={
+                typeof subHeading === "string"
+                  ? { __html: subHeading }
+                  : undefined
+              }
+            />
+          )}
+
+          {!bgImageUrl && productSpecificMessage && (
+            <p className="text-sm italic mt-2" style={{ color: textColorBody }}>
+              {productSpecificMessage}
+            </p>
+          )}
         </div>
+
+        {/* Form */}
+        <form
+          onSubmit={handleSubmit}
+          className="relative z-40 mt-8 w-full flex flex-col items-end"
+        >
+          <div className="max-w-lg space-y-2">
+            {introText && (
+              <p
+                className="text-base"
+                style={{ color: textColorBody }}
+                dangerouslySetInnerHTML={
+                  typeof introText === "string"
+                    ? { __html: introText }
+                    : undefined
+                }
+              />
+            )}
+
+            <InputGroup className="h-14 border border-black rounded-none">
+              <InputGroupInput
+                id="preorder-email"
+                name="email"
+                placeholder={inputPlaceholder}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full !text-lg placeholder-gray-400"
+              />
+              <InputGroupAddon align="inline-end">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="h-14 flex items-center justify-center px-5 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: ctaBackground,
+                    color: ctaTextColor,
+                  }}
+                  aria-label="Submit"
+                >
+                  {loading ? "submitting..." : ctaText}
+                </button>
+              </InputGroupAddon>
+            </InputGroup>
+
+            <p className="text-xs text-black w-full flex flex-col items-end">
+              {consentText && (
+                <span
+                  dangerouslySetInnerHTML={
+                    typeof consentText === "string"
+                      ? { __html: consentText }
+                      : undefined
+                  }
+                />
+              )}
+              {consentSubText && <span>{consentSubText}</span>}
+            </p>
+          </div>
+        </form>
       </div>
     </div>
   );

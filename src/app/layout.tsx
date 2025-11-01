@@ -14,6 +14,7 @@ import { AddressProvider } from "@/context/AddressContext";
 import ClientLayout from "@/app/components/ClientLayout";
 import LenisProvider from "@/components/LenisProvider";
 import GTMDebugPanel from "@/components/GTMDebugPanel";
+import { ModalProvider } from "@/context/ModalContext";
 
 const oldStandardTT = Old_Standard_TT({
   weight: ["400", "700"],
@@ -207,7 +208,9 @@ export default function RootLayout({
                 <AuthProvider>
                   <AddressProvider>
                     <CartProvider>
-                      <ClientLayout>{children}</ClientLayout>
+                      <ModalProvider>
+                        <ClientLayout>{children}</ClientLayout>
+                      </ModalProvider>
                     </CartProvider>
                   </AddressProvider>
                 </AuthProvider>

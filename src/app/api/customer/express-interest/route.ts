@@ -58,12 +58,12 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const { productId, firstName, lastName, email } = await request.json();
-    console.log("Express Interest API: Request data", {
-      productId: productId ? "provided" : "missing",
-      firstName: firstName ? "provided" : "not provided (optional)",
-      lastName: lastName ? "provided" : "not provided (optional)",
-      email: email ? "provided" : "missing",
-    });
+    // console.log("Express Interest API: Request data", {
+    //   productId: productId ? "provided" : "missing",
+    //   firstName: firstName ? "provided" : "not provided (optional)",
+    //   lastName: lastName ? "provided" : "not provided (optional)",
+    //   email: email ? "provided" : "missing",
+    // });
 
     // Only require productId and email now; names are optional
     if (!productId || !email) {
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     if (authResult.success && authResult.user) {
       customerId = authResult.user.customerId;
-      console.log("Express Interest API: Authenticated user", { customerId });
+      // console.log("Express Interest API: Authenticated user", { customerId });
     } else {
       console.log("Express Interest API: Non-authenticated user submission");
     }
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Step 1: Fetch current metafield value
-    console.log("Express Interest API: Fetching current metafield data");
+    // console.log("Express Interest API: Fetching current metafield data");
     const fetchQuery = `
       query GetInterestedCustomers($productId: ID!) {
         product(id: $productId) {
@@ -118,11 +118,11 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    console.log("Express Interest API: Fetched metafield response", {
-      productExists: !!fetchResponse.product,
-      metafieldExists: !!fetchResponse.product?.metafield,
-      currentValue: fetchResponse.product?.metafield?.value || "null",
-    });
+    // console.log("Express Interest API: Fetched metafield response", {
+    //   productExists: !!fetchResponse.product,
+    //   metafieldExists: !!fetchResponse.product?.metafield,
+    //   currentValue: fetchResponse.product?.metafield?.value || "null",
+    // });
 
     if (!fetchResponse.product) {
       console.error("Express Interest API: Product not found", { productId });
@@ -135,21 +135,21 @@ export async function POST(request: NextRequest) {
 
     if (currentMetafield?.jsonValue) {
       existingCustomers = currentMetafield.jsonValue.customers || [];
-      console.log("Express Interest API: Parsed existing customers", {
-        count: existingCustomers.length,
-      });
+      // console.log("Express Interest API: Parsed existing customers", {
+      //   count: existingCustomers.length,
+      // });
     } else if (currentMetafield?.value) {
       try {
         const parsed = JSON.parse(
           currentMetafield.value
         ) as InterestedCustomersData;
         existingCustomers = parsed.customers || [];
-        console.log(
-          "Express Interest API: Parsed customers from value string",
-          {
-            count: existingCustomers.length,
-          }
-        );
+        // console.log(
+        //   "Express Interest API: Parsed customers from value string",
+        //   {
+        //     count: existingCustomers.length,
+        //   }
+        // );
       } catch (error) {
         console.warn(
           "Express Interest API: Failed to parse existing metafield value",
@@ -172,10 +172,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (isDuplicate) {
-      console.log("Express Interest API: Duplicate customer found", {
-        email,
-        customerId,
-      });
+      // console.log("Express Interest API: Duplicate customer found", {
+      //   email,
+      //   customerId,
+      // });
       return NextResponse.json(
         {
           message:
@@ -195,12 +195,12 @@ export async function POST(request: NextRequest) {
       ...(customerId ? { customer_id: customerId } : {}),
     };
 
-    console.log("Express Interest API: Creating new customer entry", {
-      hasCustomerId: !!customerId,
-      hasFirstName: !!firstName,
-      hasLastName: !!lastName,
-      email: email,
-    });
+    // console.log("Express Interest API: Creating new customer entry", {
+    //   hasCustomerId: !!customerId,
+    //   hasFirstName: !!firstName,
+    //   hasLastName: !!lastName,
+    //   email: email,
+    // });
 
     // Step 5: Append new customer to existing list
     const updatedCustomers = [...existingCustomers, newCustomer];
@@ -208,10 +208,10 @@ export async function POST(request: NextRequest) {
       customers: updatedCustomers,
     };
 
-    console.log("Express Interest API: Updated customers list", {
-      previousCount: existingCustomers.length,
-      newCount: updatedCustomers.length,
-    });
+    // console.log("Express Interest API: Updated customers list", {
+    //   previousCount: existingCustomers.length,
+    //   newCount: updatedCustomers.length,
+    // });
 
     // Step 6: Update metafield with new data
     const updateMutation = `
@@ -249,11 +249,11 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    console.log("Express Interest API: Metafield update response", {
-      metafieldsCount: updateResponse.metafieldsSet.metafields.length,
-      errorsCount: updateResponse.metafieldsSet.userErrors.length,
-      errors: updateResponse.metafieldsSet.userErrors,
-    });
+    // console.log("Express Interest API: Metafield update response", {
+    //   metafieldsCount: updateResponse.metafieldsSet.metafields.length,
+    //   errorsCount: updateResponse.metafieldsSet.userErrors.length,
+    //   errors: updateResponse.metafieldsSet.userErrors,
+    // });
 
     if (updateResponse.metafieldsSet.userErrors.length > 0) {
       console.error(
@@ -271,11 +271,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Express Interest API: Successfully saved interest", {
-      customerId: customerId || "anonymous",
-      email: email,
-      totalCustomers: updatedCustomers.length,
-    });
+    // console.log("Express Interest API: Successfully saved interest", {
+    //   customerId: customerId || "anonymous",
+    //   email: email,
+    //   totalCustomers: updatedCustomers.length,
+    // });
 
     return NextResponse.json({
       success: true,
