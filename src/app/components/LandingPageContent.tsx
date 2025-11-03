@@ -387,6 +387,12 @@ export default function LandingPageContent() {
         pageData={pageData}
         handleImageLoad={handleImageLoad}
       />
+      <HomePageSection4
+        ref={section4Ref}
+        pageData={pageData}
+        isMobileOverlayVisible={isMobileOverlayVisible}
+        isMobile={false}
+      />
       <div ref={spacerRef} id="spacer"></div>
     </div>
   );
