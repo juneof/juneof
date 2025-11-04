@@ -13,7 +13,6 @@ import {
 } from "../ui/input-group";
 import {
   hasModalSessionShown,
-  isModalEligible,
   markModalSessionShown,
   persistModalDismiss,
 } from "@/lib/modal.client";
@@ -25,9 +24,9 @@ interface PreOrderModalProps {
     id?: string;
     title?: string;
     handle?: string;
-    availableForSale?: boolean; // optional availability flag
+    availableForSale?: boolean;
   };
-  modalDetails?: any; // flexible shape from Sanity
+  modalDetails?: any;
 }
 
 // Sanity image builder helper
@@ -86,11 +85,7 @@ export default function PreOrderModal({
   useEffect(() => {
     if (!mounted) return;
     const original = document.body.style.overflow;
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = original;
-    }
+    document.body.style.overflow = isOpen ? "hidden" : original;
     return () => {
       document.body.style.overflow = original;
     };
@@ -113,34 +108,23 @@ export default function PreOrderModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [mounted, handleKeyDown]);
 
-  // Defensive: if modalDetails absent, don't render
+  // Defensive: no modal data
   if (!modalDetails) return null;
 
-  // Session logic: if feature enabled and session key present — never render
+  // Prevent re-showing in same session
   if (typeof window !== "undefined" && modalDetails?.showOncePerSession) {
     try {
       if (hasModalSessionShown(modalDetails)) return null;
     } catch {
-      // ignore storage errors
+      // ignore
     }
   }
 
-  // Defensive client-side eligibility check
-  const productHandle = product?.handle || "";
-  const productAvailable =
-    typeof product?.availableForSale === "boolean"
-      ? product.availableForSale
-      : undefined;
-  const clientEligible = isModalEligible({
-    modal: modalDetails,
-    productHandle,
-    productAvailable,
-  });
-  if (!clientEligible) {
-    return null;
-  }
+  // 🧠 Removed redundant eligibility check
+  // The provider already ensures modal eligibility,
+  // so we don’t run isModalEligible() again here.
 
-  // Extract modal fields with safe fallbacks
+  // Extract modal fields
   const heading =
     modalDetails?.heading ||
     modalDetails?.title ||
@@ -189,16 +173,12 @@ export default function PreOrderModal({
       </span>
     ) : null;
 
-  // mark session shown helper (uses modalDetails suffix or id)
   const markSessionShown = () => {
     try {
       markModalSessionShown(modalDetails);
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
-  // handle close - mark session and call onClose
   const handleClose = () => {
     markSessionShown();
     onClose();
@@ -234,12 +214,10 @@ export default function PreOrderModal({
       );
       setEmail("");
 
-      // persist dismissal (localStorage) if configured
       try {
         persistModalDismiss(modalDetails);
       } catch {}
 
-      // mark session on successful submit and close
       markSessionShown();
       onClose();
     } catch (err) {
@@ -253,7 +231,6 @@ export default function PreOrderModal({
   if (!mounted) return null;
   if (!isOpen) return null;
 
-  // Render modal
   const modal = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
       {/* Backdrop */}
@@ -267,26 +244,21 @@ export default function PreOrderModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`Notify me when ${product?.title || "this product"} is available`}
         className="relative z-10 w-full max-w-[876px] min-h-[490px] shadow-2xl overflow-hidden flex flex-col justify-between p-8 md:p-14"
         style={{
           backgroundColor: !bgImageUrl ? backgroundColor : undefined,
           color: textColorBody,
         }}
       >
-        {/* Background image layer (absolute) */}
+        {/* Background */}
         {bgImageUrl && (
           <div
             className="absolute inset-0 bg-center bg-cover pointer-events-none"
-            style={{
-              backgroundImage: `url("${bgImageUrl}")`,
-              zIndex: 0,
-            }}
+            style={{ backgroundImage: `url("${bgImageUrl}")`, zIndex: 0 }}
             aria-hidden
           />
         )}
 
-        {/* Optional overlay for readability (uses overlayOpacity if provided) */}
         {bgImageUrl && (
           <div
             className="absolute inset-0"
@@ -302,12 +274,11 @@ export default function PreOrderModal({
           />
         )}
 
-        {/* Close */}
+        {/* Close button */}
         <button
           aria-label="Close"
           onClick={() => handleClose()}
           className="!absolute !top-4 !right-4 z-30 w-9 h-9 flex items-center justify-center hover:bg-gray-100 transition"
-          style={{ left: "auto" }}
         >
           <span className="relative block w-5 h-[2px] bg-black rotate-45" />
           <span className="absolute block w-5 h-[2px] bg-black -rotate-45" />
