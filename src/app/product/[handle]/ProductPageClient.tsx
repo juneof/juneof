@@ -780,7 +780,7 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
     <>
       <main className="flex min-h-screen bg-[#F8F4EC] text-gray-900">
         {/* Left Column - Product Title, Description and Price */}
-        <div className="sticky top-0 flex h-screen w-1/4 flex-col p-8">
+        <div className="sticky top-20 flex h-screen w-1/4 flex-col p-8">
           {/* Main content centered */}
           <div className="flex-1 flex flex-col justify-center space-y-4">
             <h1 className="text-2xl font-medium tracking-widest lowercase">
