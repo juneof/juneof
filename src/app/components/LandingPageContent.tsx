@@ -1,25 +1,27 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import Image from "next/image";
-import { Instagram } from "lucide-react";
 import ScrollIndicator from "./ScrollIndicator";
 import { useViewportHeight } from "@/hooks/useViewportHeight";
 import "../landing-page.css";
 
-// --- Sanity Imports ---
+// Sanity helpers
 import { client } from "@/sanity/lib/client";
-import { urlFor } from "@/sanity/lib/image";
 import type { SanityImageSource } from "@sanity/image-url/lib/types/types";
+
+import HomePageSection1 from "./HomePageSection1";
+import HomePageSection2 from "./HomePageSection2";
+import HomePageSection3 from "./HomePageSection3";
+import HomePageSection4 from "./HomePageSection4";
 
 // Register GSAP plugins
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-// --- Define an interface for our fetched image data ---
 interface LandingPageData {
   _id: string;
   title: string;
@@ -32,7 +34,6 @@ interface LandingPageData {
   galleryImages: SanityImageSource[];
 }
 
-// --- The GROQ Query to fetch our data ---
 const LANDING_PAGE_QUERY = `*[_type == "landingPage" && !(_id in path("drafts.**"))][0] {
   _id,
   title,
@@ -53,61 +54,45 @@ export default function LandingPageContent() {
   const section4Ref = useRef<HTMLDivElement>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
 
-  // --- State for our fetched Sanity data ---
   const [pageData, setPageData] = useState<LandingPageData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- Restored layout state ---
   const {
     dimensions,
     isMobile,
     isInitialized: isViewportInitialized,
   } = useViewportHeight();
+
   const [isMobileOverlayVisible, setIsMobileOverlayVisible] = useState(false);
   const [imagesLoaded, setImagesLoaded] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+
   const loadedImagesRef = useRef(new Set<string>());
   const animationsInitializedRef = useRef(false);
 
-  // --- Fetch data from Sanity ---
+  // Fetch data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("Fetching landing page data from Sanity...");
         const data: LandingPageData = await client.fetch(LANDING_PAGE_QUERY);
-        if (data) {
-          setPageData(data);
-          console.log("Sanity data loaded successfully:", data);
-        } else {
-          console.error("No landing page data found in Sanity.");
-        }
+        if (data) setPageData(data);
       } catch (error) {
         console.error("Failed to fetch landing page data:", error);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchData();
   }, []);
 
-  // --- Helper to safely get image URLs ---
-  const getImageUrl = (source: SanityImageSource | undefined) => {
-    if (!source) return "/placeholder.jpg"; // Fallback image
-    return urlFor(source).url();
-  };
-
-  // Track image loading for animations
+  // image load tracker
   const handleImageLoad = useCallback((src: string) => {
     loadedImagesRef.current.add(src);
-    // Check if we have loaded enough critical images
     if (loadedImagesRef.current.size >= 6) {
-      // 6 critical images
       setImagesLoaded(true);
     }
   }, []);
 
-  // Ensure DOM is ready and CSS is painted
   const ensureDOMReady = useCallback((): Promise<void> => {
     return new Promise((resolve) => {
       requestAnimationFrame(() => {
@@ -118,33 +103,25 @@ export default function LandingPageContent() {
     });
   }, []);
 
-  // Validate that elements have proper dimensions
   const validateDimensions = useCallback((): boolean => {
     if (!section1Ref.current) return false;
-
     const firstPanel = section1Ref.current.querySelector(
       ".panel.first"
-    ) as HTMLElement;
+    ) as HTMLElement | null;
     const lastPanel = section1Ref.current.querySelector(
       ".panel.last"
-    ) as HTMLElement;
+    ) as HTMLElement | null;
     const images = section1Ref.current.querySelectorAll(".panel img");
 
-    if (!firstPanel?.offsetWidth || !lastPanel?.offsetWidth) {
-      return false;
-    }
+    if (!firstPanel?.offsetWidth || !lastPanel?.offsetWidth) return false;
 
     for (const img of images) {
       const imgElement = img as HTMLImageElement;
-      if (!imgElement.offsetHeight || !imgElement.offsetWidth) {
-        return false;
-      }
+      if (!imgElement.offsetHeight || !imgElement.offsetWidth) return false;
     }
-
     return true;
   }, []);
 
-  // Main animation initialization
   const initializeAnimations = useCallback(async () => {
     if (!containerRef.current || animationsInitializedRef.current || !pageData)
       return;
@@ -160,12 +137,6 @@ export default function LandingPageContent() {
       const width = dimensions.width;
       const height = dimensions.height;
 
-      console.log("[LandingPage] Starting GSAP animations with dimensions:", {
-        width,
-        height,
-        isMobile,
-      });
-
       gsap.defaults({ ease: "none", duration: 2 });
       ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
 
@@ -175,7 +146,7 @@ export default function LandingPageContent() {
 
       const firstPanelElement = document.querySelector(
         ".section1 .panel.first"
-      ) as HTMLElement;
+      ) as HTMLElement | null;
       if (!firstPanelElement?.offsetWidth) {
         throw new Error("First panel has no width");
       }
@@ -188,14 +159,14 @@ export default function LandingPageContent() {
 
         const container = section1Ref.current.querySelector(
           ".container"
-        ) as HTMLElement;
+        ) as HTMLElement | null;
         if (container) {
           container.style.columnGap = `${section1gap}px`;
         }
 
         const firstPanel = section1Ref.current.querySelector(
           ".panel.first"
-        ) as HTMLElement;
+        ) as HTMLElement | null;
         if (firstPanel) {
           firstPanel.style.marginLeft = `${firstpanelpos}px`;
           firstPanel.style.marginRight = `${firstpanelpos - section1gap / 4}px`;
@@ -220,7 +191,7 @@ export default function LandingPageContent() {
         section3Ref.current.style.top = `${section1length}px`;
       }
 
-      // GSAP animations
+      // GSAP pin for section1
       gsap.to(".section1 .container", {
         scrollTrigger: {
           trigger: ".section1",
@@ -235,7 +206,7 @@ export default function LandingPageContent() {
 
       const lastpanel = document.querySelector(
         ".section1 .panel.last"
-      ) as HTMLElement;
+      ) as HTMLElement | null;
       if (lastpanel?.offsetWidth) {
         const lastpanelmove =
           lastpanel.offsetLeft + lastpanel.offsetWidth - width;
@@ -256,7 +227,7 @@ export default function LandingPageContent() {
       // Section 3 parallax
       const section3Image = document.querySelector(
         ".section3 .container img"
-      ) as HTMLImageElement;
+      ) as HTMLImageElement | null;
       if (section3Image?.offsetHeight) {
         gsap.to(".section3 .container img", {
           scrollTrigger: {
@@ -276,7 +247,7 @@ export default function LandingPageContent() {
         section4Ref.current.style.top = `${section1length + section3length}px`;
       }
 
-      // Section 4 parallax animations
+      // Section 4 parallax animations - keep selectors (they live in Section4)
       const section4Animations = [
         { selector: ".section4 .pic1", scrub: 2, yPercent: -150 },
         { selector: ".section4 .pic2", scrub: 0.8, yPercent: -120 },
@@ -306,7 +277,6 @@ export default function LandingPageContent() {
 
       ScrollTrigger.refresh();
 
-      // Set spacer height
       const section4length = section4Ref.current?.offsetHeight || 0;
       if (spacerRef.current) {
         spacerRef.current.style.height = `${section1length + section3length + section4length + height * 0.0001}px`;
@@ -322,12 +292,12 @@ export default function LandingPageContent() {
     }
   }, [ensureDOMReady, validateDimensions, dimensions, isMobile, pageData]);
 
-  // Handle hydration
+  // hydration
   useEffect(() => {
     setIsHydrated(true);
   }, []);
 
-  // Mobile scroll-based overlay visibility
+  // Mobile overlay observer
   useEffect(() => {
     if (!isMobile || !section4Ref.current) return;
 
@@ -341,32 +311,18 @@ export default function LandingPageContent() {
           }
         });
       },
-      {
-        threshold: [0, 0.5, 1],
-        rootMargin: "0px",
-      }
+      { threshold: [0, 0.5, 1], rootMargin: "0px" }
     );
 
     observer.observe(section4Ref.current);
 
-    return () => {
-      observer.disconnect();
-    };
+    return () => observer.disconnect();
   }, [isMobile, isHydrated]);
 
-  // Initialize animations when all conditions are met
+  // Initialize animations when ready
   useEffect(() => {
     if (!isHydrated || !imagesLoaded || !isViewportInitialized || !pageData)
       return;
-
-    console.log("[LandingPage] Initializing animations:", {
-      isHydrated,
-      imagesLoaded,
-      isViewportInitialized,
-      pageData: !!pageData,
-      isMobile,
-      dimensions,
-    });
 
     initializeAnimations();
 
@@ -384,7 +340,7 @@ export default function LandingPageContent() {
     pageData,
   ]);
 
-  // Trigger re-initialization when dimensions change
+  // Re-init on dimension change
   useEffect(() => {
     if (isViewportInitialized && isHydrated && imagesLoaded && pageData) {
       animationsInitializedRef.current = false;
@@ -394,9 +350,7 @@ export default function LandingPageContent() {
         initializeAnimations();
       }, 50);
 
-      return () => {
-        clearTimeout(timeoutId);
-      };
+      return () => clearTimeout(timeoutId);
     }
   }, [
     dimensions,
@@ -407,8 +361,6 @@ export default function LandingPageContent() {
     pageData,
   ]);
 
-  // --- Conditional Rendering ---
-  // Show a loading state until data is fetched
   if (isLoading || !pageData) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#FDF3E1]">
@@ -420,218 +372,27 @@ export default function LandingPageContent() {
   return (
     <div ref={containerRef} className="relative w-full z-[2]">
       <ScrollIndicator />
-
-      {/* --- SECTION 1 --- */}
-      <div
+      <HomePageSection1
         ref={section1Ref}
-        className="section1 absolute block w-screen bg-[#FDF3E1] text-black md:bg-transparent"
-      >
-        <div className="container flex flex-row h-screen md:h-screen max-md:h-auto overflow-hidden w-screen max-w-none left-0 max-md:flex-col">
-          <div className="panel first relative h-screen md:h-screen max-md:h-auto max-md:flex max-md:items-center max-md:justify-center max-md:pt-24 max-md:pb-12">
-            <Image
-              className="pic1 relative block w-auto md:w-full max-md:w-[90vw] max-md:h-auto"
-              src={getImageUrl(pageData.section1_image1)}
-              alt="june of sustainable fashion model wearing heritage-inspired clothing"
-              width={800}
-              height={600}
-              priority
-              sizes="(max-width: 768px) 90vw, 50vw"
-              onLoad={() =>
-                handleImageLoad(getImageUrl(pageData.section1_image1))
-              }
-            />
-          </div>
-          <div className="panel relative h-screen max-md:h-auto max-md:flex max-md:items-center max-md:justify-center max-md:pt-24 max-md:pb-12">
-            <Image
-              className="pic2 relative block w-full"
-              src={getImageUrl(pageData.section1_image2)}
-              alt="artisanal handwoven kantha cotton clothing from june of"
-              width={800}
-              height={600}
-              priority
-              sizes="(max-width: 768px) 72vw, 35vw"
-              onLoad={() =>
-                handleImageLoad(getImageUrl(pageData.section1_image2))
-              }
-            />
-          </div>
-          <div className="panel relative h-screen max-md:h-auto max-md:flex max-md:items-center max-md:justify-center max-md:pt-24 max-md:pb-12">
-            <Image
-              className="pic3 relative block w-full"
-              src={getImageUrl(pageData.section1_image3)}
-              alt="june of ethical fashion model showcasing timeless silhouettes"
-              width={800}
-              height={600}
-              priority
-              sizes="(max-width: 768px) 80vw, 20vw"
-              onLoad={() =>
-                handleImageLoad(getImageUrl(pageData.section1_image3))
-              }
-            />
-          </div>
-          <div className="panel last relative h-screen">
-            <Image
-              className="pic4 relative block w-full"
-              src={getImageUrl(pageData.section1_image4)}
-              alt="sustainable fashion portrait featuring june of's contemporary take on textiles"
-              width={800}
-              height={600}
-              priority
-              sizes="(max-width: 768px) 80vw, 55vw"
-              onLoad={() =>
-                handleImageLoad(getImageUrl(pageData.section1_image4))
-              }
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* --- SECTION 2 --- */}
-      <div ref={section2Ref} className="section2">
-        <div className="container">
-          <Image
-            src={getImageUrl(pageData.sticky_image)}
-            alt="june of model in flowing sustainable garment"
-            width={1800}
-            height={1200}
-            priority
-            sizes="(max-width: 768px) 80vw, 55vw"
-            onLoad={() => handleImageLoad(getImageUrl(pageData.sticky_image))}
-          />
-        </div>
-      </div>
-
-      {/* --- SECTION 3 --- */}
-      <div
+        pageData={pageData}
+        handleImageLoad={handleImageLoad}
+      />
+      <HomePageSection2
+        ref={section2Ref}
+        pageData={pageData}
+        handleImageLoad={handleImageLoad}
+      />
+      <HomePageSection3
         ref={section3Ref}
-        className="section3 absolute block top-0 left-0 w-screen bg-[#FDF3E1]"
-      >
-        <div className="layout-text layout text box-border py-12 px-[3vw] lg:px-[3vw] max-lg:px-[5vw] flex justify-end">
-          <div className="w-full md:w-1/2">
-            <h1 className="text-3xl font-normal m-0 leading-tight lowercase tracking-widest">
-              a playful homage to the creative depth of India
-            </h1>
-            <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 mt-12 mb-0">
-              <p className="link">
-                <a
-                  href="/about-us"
-                  className="text-black lowercase tracking-widest hover:opacity-75 transition-opacity"
-                >
-                  about us
-                </a>
-              </p>
-              <p className="link">
-                <a
-                  href="/product-listing"
-                  className="text-black lowercase tracking-widest hover:opacity-75 transition-opacity"
-                >
-                  visit shop
-                </a>
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="container overflow-hidden bg-teal w-screen max-w-none left-0">
-          <Image
-            className="w-full scale-[1.3]"
-            src={getImageUrl(pageData.text_section_image)}
-            alt="june of sustainable fashion collection showcasing indian heritage"
-            width={1200}
-            height={800}
-            priority
-            sizes="100vw"
-            onLoad={() =>
-              handleImageLoad(getImageUrl(pageData.text_section_image))
-            }
-          />
-        </div>
-      </div>
-
-      {/* --- SECTION 4 --- */}
-      <div
+        pageData={pageData}
+        handleImageLoad={handleImageLoad}
+      />
+      <HomePageSection4
         ref={section4Ref}
-        className={`section4 absolute block top-0 left-0 w-screen h-screen overflow-hidden bg-[#F8F4EC] group cursor-pointer ${
-          isMobile && isMobileOverlayVisible ? "mobile-overlay-visible" : ""
-        }`}
-        onClick={() =>
-          window.open(
-            "https://www.instagram.com/juneof__",
-            "_blank",
-            "noopener,noreferrer"
-          )
-        }
-        role="button"
-        tabIndex={0}
-        aria-label="Visit June Of on Instagram - Sustainable fashion editorial and behind-the-scenes content"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            window.open(
-              "https://www.instagram.com/juneof__",
-              "_blank",
-              "noopener,noreferrer"
-            );
-          }
-        }}
-      >
-        {/* Dark overlay that appears on hover (desktop) or scroll (mobile) */}
-        <div
-          className={`absolute inset-0 bg-black/60 transition-opacity duration-500 ease-out z-10 pointer-events-none ${
-            isMobile
-              ? isMobileOverlayVisible
-                ? "opacity-100"
-                : "opacity-0"
-              : "opacity-0 group-hover:opacity-100"
-          }`}
-        />
-
-        {/* Instagram icon that appears on hover (desktop) or scroll (mobile) */}
-        <div
-          className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ease-out z-20 pointer-events-none ${
-            isMobile
-              ? isMobileOverlayVisible
-                ? "opacity-100"
-                : "opacity-0"
-              : "opacity-0 group-hover:opacity-100"
-          }`}
-        >
-          <Instagram
-            className="w-16 h-16 md:w-20 md:h-20 text-white"
-            strokeWidth={1.5}
-            aria-hidden="true"
-          />
-        </div>
-
-        {/* We now map over the gallery images from Sanity */}
-        {pageData.galleryImages?.map((image, index) => {
-          // Define positions to match the original design
-          const positions = [
-            "top-[50vh] left-[8.5vw] w-[20vw]",
-            "top-[90vh] left-[23vw] w-[16vw]",
-            "top-[20vh] left-[40vw] w-[20vw]",
-            "top-[99vh] left-[80vw] w-[19vw]",
-            "top-0 right-0 w-[15vw]",
-            "top-[70vh] right-[15vw] w-[17vw]",
-            "top-[40vh] right-[35vw] w-[16vw]",
-          ];
-          const positionClass = positions[index % positions.length];
-          return (
-            <Image
-              key={index}
-              className={`pic${
-                index + 1
-              } absolute min-w-[150px] max-w-[300px] ${positionClass}`}
-              src={getImageUrl(image)}
-              alt={`Gallery image ${index + 1} from june of collection`}
-              width={300}
-              height={400}
-              sizes="(max-width: 768px) 200px, 20vw"
-            />
-          );
-        })}
-      </div>
-
-      {/* This spacer element is still important for your scroll animations */}
+        pageData={pageData}
+        isMobileOverlayVisible={isMobileOverlayVisible}
+        isMobile={false}
+      />
       <div ref={spacerRef} id="spacer"></div>
     </div>
   );

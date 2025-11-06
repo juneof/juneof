@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -22,6 +23,12 @@ import {
   getSizeAvailabilityStatus,
   type ShopifyProductVariant,
 } from "@/lib/shopify";
+import PreOrderModal from "@/components/common/pre-order-modal";
+import {
+  isModalDismissed,
+  isModalEligible,
+  persistModalDismiss,
+} from "@/lib/modal.client";
 
 // Mobile detection hook
 const useIsMobile = () => {
@@ -80,6 +87,7 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
     useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isProfileCompletionOpen, setIsProfileCompletionOpen] = useState(false);
+  const [isPreOrderOpen, setIsPreOrderOpen] = useState<boolean>(false);
 
   // Add state for dynamic express interest checking
   const [currentExpressInterest, setCurrentExpressInterest] = useState(
@@ -96,8 +104,25 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
   const { refreshProfileStatus } = useProfileCompletion();
   const isMobile = useIsMobile();
   const imageGalleryRef = useRef<HTMLDivElement>(null);
+  const [fetchedModal, setFetchedModal] = useState<any | null>(null);
 
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (!product?.preOrderModal) return;
+    const modal = product.preOrderModal;
+
+    const eligible = isModalEligible({
+      modal,
+      productHandle: product.handle,
+      productAvailable: Boolean(product.availableForSale),
+    });
+
+    if (eligible && !isModalDismissed(modal)) {
+      setIsPreOrderOpen(true);
+      setFetchedModal(modal);
+    }
+  }, [product]);
 
   // NEW: Initialize available sizes from Shopify variants
   useEffect(() => {
@@ -124,6 +149,12 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
       console.log("Selected variant:", variant);
     }
   }, [product, selectedSize]);
+
+  useEffect(() => {
+    if (product && product.availableForSale === false) {
+      setIsPreOrderOpen(true);
+    }
+  }, [product]);
 
   // Track ViewContent event when the product data is available
   useEffect(() => {
@@ -726,6 +757,20 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
             isProcessingCompletion.current = false;
           }}
         />
+
+        <PreOrderModal
+          isOpen={isPreOrderOpen}
+          onClose={() => {
+            if (fetchedModal) persistModalDismiss(fetchedModal);
+            setIsPreOrderOpen(false);
+          }}
+          product={{
+            id: product.id,
+            title: product.title,
+            handle: product.handle,
+          }}
+          modalDetails={product.preOrderModal} // ✅ Pass Sanity modal here
+        />
       </>
     );
   }
@@ -981,6 +1026,20 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
           });
           isProcessingCompletion.current = false;
         }}
+      />
+
+      <PreOrderModal
+        isOpen={isPreOrderOpen}
+        onClose={() => {
+          if (fetchedModal) persistModalDismiss(fetchedModal);
+          setIsPreOrderOpen(false);
+        }}
+        product={{
+          id: product.id,
+          title: product.title,
+          handle: product.handle,
+        }}
+        modalDetails={product.preOrderModal} // ✅ Pass Sanity modal here
       />
     </>
   );
