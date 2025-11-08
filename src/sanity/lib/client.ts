@@ -1,6 +1,6 @@
 import { createClient } from "@sanity/client";
 
-import { apiVersion, dataset, projectId } from "../env";
+import { apiVersion, dataset, projectId, token } from "../env";
 
 export const client = createClient({
   projectId,
@@ -14,4 +14,5 @@ export const client = createClient({
   perspective: "published",
   // Ensure CORS compatibility
   stega: false,
+  token,
 });

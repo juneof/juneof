@@ -4,7 +4,8 @@ import { legalPage } from "./legalPage"; // <-- Import the new schema
 import { washCare } from "./washCare"; // <-- Import wash care schema
 import { sizeGuide } from "./sizeGuide"; // <-- Import size guide schema
 import preOrderModal from "./preOrderModal";
+import { preorder } from "./preorder";
 
 export const schema: { types: SchemaTypeDefinition[] } = {
-  types: [landingPage, legalPage, washCare, sizeGuide, preOrderModal], // <-- Add new schemas to the array
+  types: [landingPage, legalPage, washCare, sizeGuide, preOrderModal, preorder], // <-- Add new schemas to the array
 };
