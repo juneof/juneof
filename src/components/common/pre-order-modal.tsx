@@ -140,7 +140,7 @@ export default function PreOrderModal({
     modalDetails?.consentText ||
     "By completing this form, you are signing up to receive our emails and can unsubscribe anytime.";
   const consentSubText =
-    modalDetails?.consentSubText || "(But it won't spam you)";
+    modalDetails?.consentSubText || "(But we won't spam you)";
   const ctaText = modalDetails?.ctaText || "keep me posted";
   const discountPercent =
     typeof modalDetails?.discountPercent === "number"
