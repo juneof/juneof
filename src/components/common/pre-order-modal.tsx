@@ -59,6 +59,7 @@ export default function PreOrderModal({
   product,
   modalDetails,
 }: PreOrderModalProps) {
+  console.log("Rendering PreOrderModal:", { isOpen, product, modalDetails });
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [email, setEmail] = useState("");
@@ -185,6 +186,7 @@ export default function PreOrderModal({
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log("Product:", product);
     e.preventDefault();
     if (!email || !/\S+@\S+\.\S+/.test(email)) {
       toast.error("Please enter a valid email");
@@ -193,31 +195,80 @@ export default function PreOrderModal({
 
     try {
       setLoading(true);
-      const res = await fetch("/api/customer/express-interest", {
+
+      // Prefer explicit product prop
+      const explicitHandle = product?.handle ?? null;
+      const explicitId = product?.id ?? null;
+      const explicitTitle = product?.title ?? null;
+
+      // Derive handle from modalDetails if product not passed
+      const handleFromModal =
+        modalDetails?.showOnProductHandles?.[0] ??
+        (Array.isArray(modalDetails?.slugs) ? modalDetails.slugs[0] : null);
+
+      // If slug like "product/the-godet-dress-pre-order", extract last segment as handle
+      const derivedHandle =
+        explicitHandle ||
+        (typeof handleFromModal === "string"
+          ? handleFromModal.split("/").pop()
+          : null);
+
+      // As a final fallback, derive handle from current URL pathname
+      let derivedFromUrl = null;
+      try {
+        const pathname =
+          typeof window !== "undefined"
+            ? new URL(window.location.href).pathname
+            : "";
+        if (pathname) {
+          const parts = pathname.split("/").filter(Boolean);
+          if (parts.length) derivedFromUrl = parts[parts.length - 1];
+        }
+      } catch {
+        derivedFromUrl = null;
+      }
+
+      const productHandle =
+        explicitHandle || derivedHandle || derivedFromUrl || null;
+      const payload = {
+        email,
+        productId: explicitId ?? null,
+        productTitle: explicitTitle ?? null,
+        productHandle,
+        url: typeof window !== "undefined" ? window.location.href : null,
+        modalDetails: modalDetails ?? null,
+      };
+
+      const res = await fetch("/api/customer/pre-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: product?.id,
-          email,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data?.message || "Something went wrong. Try again.");
+        toast.error(
+          data?.message || data?.error || "Something went wrong. Try again."
+        );
         return;
       }
 
-      toast.success(
-        data?.message || "Thanks — we'll notify you when it's back!"
-      );
+      if (data?.alreadySignedUp) {
+        toast.success(
+          "oops! you've already signed up for this (we see how excited you are - you'll be the first to know we promise!)"
+        );
+      } else {
+        toast.success(
+          data?.message || "Thanks — we'll notify you when it's back!"
+        );
+      }
+
       setEmail("");
 
       try {
         persistModalDismiss(modalDetails);
       } catch {}
-
       markSessionShown();
       onClose();
     } catch (err) {
