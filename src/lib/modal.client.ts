@@ -32,7 +32,7 @@ function slugArrayIncludes(slugs: any[] | undefined, value: string) {
 /**
  * Client-side eligibility check.
  *
- * - Matches by slugs OR showOnProductHandles OR allowOnProductPages.
+ * - Matches by slugs OR showOnProductHandles OR allowOnPreOrderProductPages.
  * - Only enforces startAt/endAt when enableSchedule === true.
  * - Optionally prevents showing for available products.
  */
@@ -66,8 +66,8 @@ export function isModalEligible({
     if (!productHandle) return false;
     if (!modal.showOnProductHandles.includes(productHandle)) return false;
   } else {
-    // fallback: respect allowOnProductPages flag
-    if (modal.allowOnProductPages === false) return false;
+    // fallback: respect allowOnPreOrderProductPages flag
+    if (modal.allowOnPreOrderProductPages === false) return false;
   }
 
   // schedule: only when toggle is ON

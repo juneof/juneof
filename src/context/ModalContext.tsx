@@ -64,7 +64,7 @@ async function fetchModalForRoute({
   handle?: string | null;
 }) {
   const baseSelect = `{
-    _id, modalName, title, enabled, allowOnProductPages,
+    _id, modalName, title, enabled, allowOnPreOrderProductPages,
     enableSchedule, startAt, endAt,
     enableDismissDuration, dismissDurationDays,
     showOncePerSession, showOnceSessionKeySuffix,

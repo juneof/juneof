@@ -10,7 +10,7 @@ export const preOrderModal = defineType({
 
   initialValue: {
     enabled: true,
-    allowOnProductPages: false,
+    allowOnPreOrderProductPages: false,
     enableSchedule: false,
     priority: 0,
     ctaText: "keep me posted",
@@ -47,7 +47,7 @@ export const preOrderModal = defineType({
       initialValue: true,
     }),
 
-    // Slugs: require at least one targeting method (slugs OR allowOnProductPages)
+    // Slugs: require at least one targeting method (slugs OR allowOnPreOrderProductPages)
     defineField({
       name: "slugs",
       title: "Specific page slugs / paths",
@@ -57,21 +57,20 @@ export const preOrderModal = defineType({
         "Exact paths where this modal should appear (e.g. '/', 'product-listing', 'product/juneof-jacket').",
       validation: (Rule) =>
         Rule.custom((slugs: any, context: any) => {
-          const allowOnProductPages = context.document?.allowOnProductPages;
+          const allowOnPreOrderProductPages = context.document?.allowOnPreOrderProductPages;
           const hasSlugs = Array.isArray(slugs) && slugs.length > 0;
-          if (!allowOnProductPages && !hasSlugs) {
-            return 'Either add at least one slug or enable "Allow on product detail pages".';
+          if (!allowOnPreOrderProductPages && !hasSlugs) {
+            return 'Either add at least one slug or enable "Allow on pre-order product pages".';
           }
           return true;
         }),
     }),
 
     defineField({
-      name: "allowOnProductPages",
-      title: "Allow on product detail pages",
+      name: "allowOnPreOrderProductPages",
+      title: "Allow on pre-order product pages",
       type: "boolean",
-      description:
-        "When ON, the modal will show on product detail pages (e.g., /product/:handle). When OFF, use the 'slugs' field to target pages.",
+      description: "When ON, the modal will show on pre-order product pages.",
       initialValue: false,
     }),
 
