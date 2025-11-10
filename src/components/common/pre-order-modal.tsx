@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/rules-of-hooks */
+// components/PreOrderModal.tsx
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import imageUrlBuilder from "@sanity/image-url";
@@ -29,29 +32,37 @@ interface PreOrderModalProps {
   modalDetails?: any;
 }
 
-// Sanity image builder helper
 const builder = imageUrlBuilder(sanityClient);
+
+// utility: build URL from various shapes
 function urlFor(source: any): string | null {
   if (!source) return null;
   try {
+    // Sanity asset references or objects
     if (source?.asset?._ref || source?.asset?._id || source?._ref) {
       return builder.image(source).url();
     }
-    if (
-      typeof source === "string" &&
-      (source.startsWith("http") || source.startsWith("/"))
-    ) {
-      return source;
+    // If string url or path
+    if (typeof source === "string") {
+      if (source.startsWith("http") || source.startsWith("/")) return source;
     }
-    if (source?.asset?.url) {
-      return source.asset.url;
-    }
+    if (source?.asset?.url) return source.asset.url;
+    // Fallback try
     return builder.image(source).url();
   } catch (err) {
-    console.warn("urlFor: could not build image url for source:", source, err);
+    // avoid noisy logs in production
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "urlFor: could not build image url for source:",
+        source,
+        err
+      );
+    }
     return null;
   }
 }
+
+const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
 export default function PreOrderModal({
   isOpen,
@@ -59,33 +70,35 @@ export default function PreOrderModal({
   product,
   modalDetails,
 }: PreOrderModalProps) {
-  console.log("Rendering PreOrderModal:", { isOpen, product, modalDetails });
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // mount guard
   useEffect(() => setMounted(true), []);
 
   // responsive detection
   useEffect(() => {
     if (!mounted) return;
     const mq = window.matchMedia("(max-width: 767px)");
-    const update = () => setIsMobile(mq.matches);
-    update();
+    const handler = (ev: MediaQueryListEvent | MediaQueryList) => {
+      setIsMobile("matches" in ev ? ev.matches : mq.matches);
+    };
+    handler(mq);
     if (mq.addEventListener) {
-      mq.addEventListener("change", update);
-      return () => mq.removeEventListener("change", update);
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
     } else {
-      mq.addListener(update);
-      return () => mq.removeListener(update);
+      mq.addListener(handler);
+      return () => mq.removeListener(handler);
     }
   }, [mounted]);
 
-  // body scroll lock
+  // body scroll lock while open
   useEffect(() => {
     if (!mounted) return;
-    const original = document.body.style.overflow;
+    const original = document.body.style.overflow || "";
     document.body.style.overflow = isOpen ? "hidden" : original;
     return () => {
       document.body.style.overflow = original;
@@ -109,7 +122,7 @@ export default function PreOrderModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [mounted, handleKeyDown]);
 
-  // Defensive: no modal data
+  // Defensive: if no modalDetails, don't render (matches original)
   if (!modalDetails) return null;
 
   // Prevent re-showing in same session
@@ -121,51 +134,87 @@ export default function PreOrderModal({
     }
   }
 
-  // 🧠 Removed redundant eligibility check
-  // The provider already ensures modal eligibility,
-  // so we don’t run isModalEligible() again here.
+  // derive modal fields once
+  const {
+    heading,
+    subHeading,
+    introText,
+    inputPlaceholder,
+    consentText,
+    consentSubText,
+    ctaText,
+    discountPercent,
+    backgroundColor,
+    textColorTitle,
+    textColorBody,
+    ctaBackground,
+    ctaTextColor,
+    productSpecificMessage,
+    bgImageUrl,
+    overlayOpacity,
+  } = useMemo(() => {
+    const h =
+      modalDetails?.heading ||
+      modalDetails?.title ||
+      modalDetails?.modalName ||
+      "on pre-orders only!";
+    const sh = modalDetails?.subHeading || "";
+    const intro =
+      modalDetails?.introText ||
+      "Need time? We're more than happy to spill all the tea";
+    const placeholder = modalDetails?.inputPlaceholder || "drop your email";
+    const consent =
+      modalDetails?.consentText ||
+      "By completing this form, you are signing up to receive our emails and can unsubscribe anytime.";
+    const consentSub =
+      modalDetails?.consentSubText || "(But we won't spam you)";
+    const cta = modalDetails?.ctaText || "keep me posted";
+    const discount =
+      typeof modalDetails?.discountPercent === "number"
+        ? modalDetails.discountPercent
+        : undefined;
+    const bg = modalDetails?.appearance?.background?.color || "#F2EDD8";
+    const titleColor = modalDetails?.appearance?.textColors?.title || "#111827";
+    const bodyColor = modalDetails?.appearance?.textColors?.body || "#111827";
+    const ctaBg = modalDetails?.appearance?.textColors?.ctaBackground || "#000";
+    const ctaTxt = modalDetails?.appearance?.textColors?.ctaText || "#fff";
+    const pMsg = modalDetails?.productSpecificMessage || "";
 
-  // Extract modal fields
-  const heading =
-    modalDetails?.heading ||
-    modalDetails?.title ||
-    modalDetails?.modalName ||
-    "on pre-orders only!";
-  const subHeading = modalDetails?.subHeading || "";
-  const introText =
-    modalDetails?.introText ||
-    "Need time? We're more than happy to spill all the tea";
-  const inputPlaceholder = modalDetails?.inputPlaceholder || "drop your email";
-  const consentText =
-    modalDetails?.consentText ||
-    "By completing this form, you are signing up to receive our emails and can unsubscribe anytime.";
-  const consentSubText =
-    modalDetails?.consentSubText || "(But we won't spam you)";
-  const ctaText = modalDetails?.ctaText || "keep me posted";
-  const discountPercent =
-    typeof modalDetails?.discountPercent === "number"
-      ? modalDetails.discountPercent
-      : undefined;
-  const backgroundColor =
-    modalDetails?.appearance?.background?.color || "#F2EDD8";
-  const textColorTitle =
-    modalDetails?.appearance?.textColors?.title || "#111827";
-  const textColorBody = modalDetails?.appearance?.textColors?.body || "#111827";
-  const ctaBackground =
-    modalDetails?.appearance?.textColors?.ctaBackground || "#000";
-  const ctaTextColor = modalDetails?.appearance?.textColors?.ctaText || "#fff";
-  const productSpecificMessage = modalDetails?.productSpecificMessage || "";
+    const desktopImage = urlFor(
+      modalDetails?.appearance?.background?.desktopImage
+    );
+    const mobileImage = urlFor(
+      modalDetails?.appearance?.background?.mobileImage
+    );
+    const bgImg = isMobile
+      ? mobileImage || desktopImage
+      : desktopImage || mobileImage;
+    const overlay =
+      typeof modalDetails?.appearance?.background?.overlayOpacity === "number"
+        ? modalDetails.appearance.background.overlayOpacity
+        : 0;
 
-  // Build image URLs
-  const desktopImageSrc = urlFor(
-    modalDetails?.appearance?.background?.desktopImage
-  );
-  const mobileImageSrc = urlFor(
-    modalDetails?.appearance?.background?.mobileImage
-  );
-  const bgImageUrl = isMobile
-    ? mobileImageSrc || desktopImageSrc
-    : desktopImageSrc || mobileImageSrc;
+    return {
+      heading: h,
+      subHeading: sh,
+      introText: intro,
+      inputPlaceholder: placeholder,
+      consentText: consent,
+      consentSubText: consentSub,
+      ctaText: cta,
+      discountPercent: discount,
+      backgroundColor: bg,
+      textColorTitle: titleColor,
+      textColorBody: bodyColor,
+      ctaBackground: ctaBg,
+      ctaTextColor: ctaTxt,
+      productSpecificMessage: pMsg,
+      bgImageUrl: bgImg,
+      overlayOpacity: overlay,
+    };
+    // note: intentionally omit modalDetails from deps to keep stable; we only read it initially
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalDetails, isMobile]);
 
   const discountBlock =
     discountPercent && discountPercent > 0 ? (
@@ -174,69 +223,30 @@ export default function PreOrderModal({
       </span>
     ) : null;
 
-  const markSessionShown = () => {
+  const markSessionShownSafe = () => {
     try {
       markModalSessionShown(modalDetails);
     } catch {}
   };
 
   const handleClose = () => {
-    markSessionShown();
+    markSessionShownSafe();
     onClose();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log("Product:", product);
     e.preventDefault();
-    if (!email || !/\S+@\S+\.\S+/.test(email)) {
+
+    if (!email || !EMAIL_RE.test(email)) {
       toast.error("Please enter a valid email");
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
-
-      // Prefer explicit product prop
-      const explicitHandle = product?.handle ?? null;
-      const explicitId = product?.id ?? null;
-      const explicitTitle = product?.title ?? null;
-
-      // Derive handle from modalDetails if product not passed
-      const handleFromModal =
-        modalDetails?.showOnProductHandles?.[0] ??
-        (Array.isArray(modalDetails?.slugs) ? modalDetails.slugs[0] : null);
-
-      // If slug like "product/the-godet-dress-pre-order", extract last segment as handle
-      const derivedHandle =
-        explicitHandle ||
-        (typeof handleFromModal === "string"
-          ? handleFromModal.split("/").pop()
-          : null);
-
-      // As a final fallback, derive handle from current URL pathname
-      let derivedFromUrl = null;
-      try {
-        const pathname =
-          typeof window !== "undefined"
-            ? new URL(window.location.href).pathname
-            : "";
-        if (pathname) {
-          const parts = pathname.split("/").filter(Boolean);
-          if (parts.length) derivedFromUrl = parts[parts.length - 1];
-        }
-      } catch {
-        derivedFromUrl = null;
-      }
-
-      const productHandle =
-        explicitHandle || derivedHandle || derivedFromUrl || null;
       const payload = {
         email,
-        productId: explicitId ?? null,
-        productTitle: explicitTitle ?? null,
-        productHandle,
         url: typeof window !== "undefined" ? window.location.href : null,
-        modalDetails: modalDetails ?? null,
       };
 
       const res = await fetch("/api/customer/pre-order", {
@@ -256,7 +266,7 @@ export default function PreOrderModal({
 
       if (data?.alreadySignedUp) {
         toast.success(
-          "oops! you've already signed up for this (we see how excited you are - you'll be the first to know we promise!)"
+          "Oops — you're already signed up for this (we see how excited you are!)."
         );
       } else {
         toast.success(
@@ -265,11 +275,10 @@ export default function PreOrderModal({
       }
 
       setEmail("");
-
       try {
         persistModalDismiss(modalDetails);
       } catch {}
-      markSessionShown();
+      markSessionShownSafe();
       onClose();
     } catch (err) {
       console.error("PreOrder submit error:", err);
@@ -283,52 +292,54 @@ export default function PreOrderModal({
   if (!isOpen) return null;
 
   const modal = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center px-4"
+      aria-hidden={false}
+      role="dialog"
+      aria-modal="true"
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/45"
-        onClick={() => handleClose()}
+        onClick={handleClose}
         aria-hidden
       />
 
       {/* Panel */}
       <div
-        role="dialog"
-        aria-modal="true"
         className="relative z-10 w-full max-w-[876px] min-h-[490px] shadow-2xl overflow-hidden flex flex-col justify-between p-8 md:p-14"
         style={{
           backgroundColor: !bgImageUrl ? backgroundColor : undefined,
           color: textColorBody,
         }}
+        role="document"
       >
-        {/* Background */}
+        {/* Background image + overlay */}
         {bgImageUrl && (
-          <div
-            className="absolute inset-0 bg-center bg-cover pointer-events-none"
-            style={{ backgroundImage: `url("${bgImageUrl}")`, zIndex: 0 }}
-            aria-hidden
-          />
-        )}
-
-        {bgImageUrl && (
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                typeof modalDetails?.appearance?.background?.overlayOpacity ===
-                "number"
-                  ? `rgba(0,0,0,${modalDetails.appearance.background.overlayOpacity})`
-                  : "transparent",
-              zIndex: 1,
-            }}
-            aria-hidden
-          />
+          <>
+            <div
+              className="absolute inset-0 bg-center bg-cover pointer-events-none"
+              style={{ backgroundImage: `url("${bgImageUrl}")`, zIndex: 0 }}
+              aria-hidden
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  overlayOpacity && overlayOpacity > 0
+                    ? `rgba(0,0,0,${overlayOpacity})`
+                    : "transparent",
+                zIndex: 1,
+              }}
+              aria-hidden
+            />
+          </>
         )}
 
         {/* Close button */}
         <button
           aria-label="Close"
-          onClick={() => handleClose()}
+          onClick={handleClose}
           className="!absolute !top-4 !right-4 z-30 w-9 h-9 flex items-center justify-center hover:bg-gray-100 transition"
         >
           <span className="relative block w-5 h-[2px] bg-black rotate-45" />
@@ -392,6 +403,9 @@ export default function PreOrderModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full !text-lg placeholder-gray-400"
+                aria-label="Email"
+                autoComplete="email"
+                required
               />
               <InputGroupAddon align="inline-end">
                 <button

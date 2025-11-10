@@ -16,25 +16,7 @@ export const preorder = defineType({
       validation: (Rule) => Rule.required().email(),
     }),
 
-    defineField({
-      name: "productId",
-      title: "Product ID",
-      type: "string",
-    }),
-
-    defineField({
-      name: "productTitle",
-      title: "Product Title",
-      type: "string",
-    }),
-
-    defineField({
-      name: "productHandle",
-      title: "Product Handle",
-      type: "string",
-    }),
-
-    // 2️⃣ Modal and Context
+    //  Modal and Context
     defineField({
       name: "url",
       title: "Opened On URL",
@@ -42,94 +24,7 @@ export const preorder = defineType({
       description: "The page URL where the modal was opened.",
     }),
 
-    defineField({
-      name: "modalDetails",
-      title: "Modal Details Snapshot",
-      type: "object",
-      options: { collapsible: true, collapsed: true },
-      fields: [
-        defineField({
-          name: "heading",
-          title: "Heading",
-          type: "string",
-        }),
-        defineField({
-          name: "ctaText",
-          title: "CTA Text",
-          type: "string",
-        }),
-        defineField({
-          name: "discountPercent",
-          title: "Discount (%)",
-          type: "number",
-        }),
-        defineField({
-          name: "appearance",
-          title: "Appearance",
-          type: "object",
-          options: { collapsible: true, collapsed: true },
-          fields: [
-            defineField({
-              name: "background",
-              title: "Background",
-              type: "object",
-              fields: [
-                defineField({
-                  name: "color",
-                  title: "Background Color",
-                  type: "string",
-                }),
-                defineField({
-                  name: "desktopImage",
-                  title: "Desktop Image",
-                  type: "image",
-                }),
-                defineField({
-                  name: "mobileImage",
-                  title: "Mobile Image",
-                  type: "image",
-                }),
-                defineField({
-                  name: "overlayOpacity",
-                  title: "Overlay Opacity",
-                  type: "number",
-                  description: "Value between 0 and 1",
-                }),
-              ],
-            }),
-            defineField({
-              name: "textColors",
-              title: "Text Colors",
-              type: "object",
-              fields: [
-                defineField({
-                  name: "title",
-                  title: "Title Color",
-                  type: "string",
-                }),
-                defineField({
-                  name: "body",
-                  title: "Body Color",
-                  type: "string",
-                }),
-                defineField({
-                  name: "ctaBackground",
-                  title: "CTA Background",
-                  type: "string",
-                }),
-                defineField({
-                  name: "ctaText",
-                  title: "CTA Text",
-                  type: "string",
-                }),
-              ],
-            }),
-          ],
-        }),
-      ],
-    }),
-
-    // 3️⃣ Meta
+    // 2️⃣ Meta
     defineField({
       name: "createdAt",
       title: "Created At",
