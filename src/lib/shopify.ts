@@ -105,6 +105,8 @@ export const GET_FIRST_5_PRODUCTS_QUERY = gql`
           title
           handle
           description
+          createdAt
+          updatedAt
           priceRange {
             minVariantPrice {
               amount
@@ -112,6 +114,41 @@ export const GET_FIRST_5_PRODUCTS_QUERY = gql`
             }
           }
           images(first: 1) {
+            edges {
+              node {
+                url
+                altText
+              }
+            }
+          }
+          metafield(namespace: "custom", key: "express_interest") {
+            value
+            type
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const GET_LATEST_PRODUCTS_QUERY = gql`
+  query GetLatestProducts($first: Int = 8) {
+    products(first: $first, sortKey: CREATED_AT, reverse: true) {
+      edges {
+        node {
+          id
+          title
+          handle
+          description
+          createdAt
+          updatedAt
+          priceRange {
+            minVariantPrice {
+              amount
+              currencyCode
+            }
+          }
+          images(first: 3) {
             edges {
               node {
                 url
@@ -139,6 +176,8 @@ export const GET_PRODUCTS_FOR_LISTING_QUERY = gql`
           title
           handle
           description
+          createdAt
+          updatedAt
           priceRange {
             minVariantPrice {
               amount
@@ -171,6 +210,8 @@ export const GET_PRODUCT_BY_HANDLE_QUERY = gql`
       title
       handle
       description
+      createdAt
+      updatedAt
       descriptionHtml
       availableForSale
       priceRange {
@@ -661,6 +702,8 @@ export interface ShopifyProductNode {
   title: string;
   handle: string;
   description: string;
+  createdAt: string;
+  updatedAt: string;
   priceRange: ShopifyPriceRange;
   images: {
     edges: {
@@ -1160,6 +1203,23 @@ export async function createCartAndRedirect(
   }
 }
 
+export async function getLatestProducts() {
+  try {
+    const data = await storefrontApiRequest<ShopifyProductsData>(
+      GET_LATEST_PRODUCTS_QUERY,
+      { first: 8 }
+    );
+
+    // Flatten products
+    const products = data.products.edges.map((edge) => edge.node);
+
+    return products;
+  } catch (error) {
+    console.error("Failed to fetch latest products:", error);
+    return [];
+  }
+}
+
 // --- Client-side preload function for splash screen ---
 export async function preloadShopifyProducts(): Promise<{
   products: ShopifyProductNode[];
@@ -1171,7 +1231,12 @@ export async function preloadShopifyProducts(): Promise<{
       { first: 20 } // Preload first 20 products
     );
 
-    const products = data.products.edges.map((edge) => edge.node);
+    const products = data.products.edges.map((edge) => {
+      const node = edge.node;
+      return {
+        ...node,
+      } as ShopifyProductNode;
+    });
 
     // Extract all image URLs for preloading
     const imageUrls: string[] = [];

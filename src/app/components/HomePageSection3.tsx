@@ -3,7 +3,7 @@ import React from "react";
 import Image from "next/image";
 import { getImageUrl } from "@/sanity/lib/image";
 import type { SanityImageSource } from "@sanity/image-url/lib/types/types";
-import ProductListingClient from "../product-listing/ProductListingClient";
+import LatestHomeProducts from "@/components/LatestHomeProducts";
 
 type Props = {
   pageData: {
@@ -34,7 +34,7 @@ const HomePageSection3 = React.forwardRef<HTMLDivElement, Props>(
           />
 
           <div className="absolute inset-0 z-99">
-            <ProductListingClient />
+            <LatestHomeProducts />
           </div>
         </div>
       </div>
