@@ -20,9 +20,6 @@ import {
   isModalEligible,
 } from "@/lib/modal.client";
 
-/* ----------------------
-   Types & Context
-   ---------------------- */
 type SanityModal = any;
 
 interface ModalContextType {
@@ -40,9 +37,6 @@ export function useGlobalModal() {
   return ctx;
 }
 
-/* ----------------------
-   Helpers
-   ---------------------- */
 function detectPageInfo(pathname: string | null | undefined) {
   if (!pathname || pathname === "/") return { slug: "/", handle: null };
   const normalized = pathname.replace(/^\/+|\/+$/g, "");
@@ -53,9 +47,6 @@ function detectPageInfo(pathname: string | null | undefined) {
   return { slug: normalized, handle: null };
 }
 
-/* ----------------------
-   Fetch modal for route (you already have this working)
-   ---------------------- */
 async function fetchModalForRoute({
   slug,
   handle,
@@ -71,7 +62,9 @@ async function fetchModalForRoute({
     slugs, showOnProductHandles,
     ctaText, heading, subHeading,
     discountPercent, productSpecificMessage,
-    appearance, priority, _createdAt
+    appearance, priority, _createdAt,
+    // NEW: delay fields
+    enableDisplayDelay, displayDelayUnit, displayDelayValue
   }`;
 
   const normalized = (slug ?? "").replace(/^\/+|\/+$/g, "");
@@ -111,9 +104,6 @@ async function fetchModalForRoute({
   }
 }
 
-/* ----------------------
-   ModalProvider Inner Component (wrapped in Suspense)
-   ---------------------- */
 function ModalProviderInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -121,6 +111,9 @@ function ModalProviderInner() {
   const [isOpen, setIsOpen] = useState(false);
   const [modalData, setModalData] = useState<SanityModal | null>(null);
   const [productData, setProductData] = useState<any | null>(null);
+  const [delayTimer, setDelayTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
   const openModal = useCallback((modal: SanityModal, product?: any) => {
     setModalData(modal);
@@ -180,9 +173,26 @@ function ModalProviderInner() {
           return;
         }
 
+        // Apply delay (toggle + unit + value)
+        const delayMs = modal?.enableDisplayDelay
+          ? (Number(modal.displayDelayValue) || 0) *
+            (modal.displayDelayUnit === "minutes" ? 60000 : 1000)
+          : 0;
+
         setModalData(modal);
         setProductData(null);
-        setIsOpen(true);
+
+        if (delayTimer) clearTimeout(delayTimer);
+
+        if (delayMs > 0) {
+          const t = setTimeout(() => {
+            if (!mounted) return;
+            setIsOpen(true);
+          }, delayMs);
+          setDelayTimer(t);
+        } else {
+          setIsOpen(true);
+        }
       } catch (err) {
         console.error("ModalProvider load error:", err);
       }
@@ -191,7 +201,9 @@ function ModalProviderInner() {
     load();
     return () => {
       mounted = false;
+      if (delayTimer) clearTimeout(delayTimer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, searchParams]);
 
   return (
@@ -208,9 +220,6 @@ function ModalProviderInner() {
   );
 }
 
-/* ----------------------
-   Exported Provider (with Suspense wrapper)
-   ---------------------- */
 export function ModalProvider({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={null}>

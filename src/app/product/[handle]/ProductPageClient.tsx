@@ -106,8 +106,11 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
   const imageGalleryRef = useRef<HTMLDivElement>(null);
   const [fetchedModal, setFetchedModal] = useState<any | null>(null);
 
+  const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const searchParams = useSearchParams();
 
+  // Delay-aware modal open for server-fetched preOrderModal
   useEffect(() => {
     if (!product?.preOrderModal) return;
     const modal = product.preOrderModal;
@@ -119,8 +122,48 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
     });
 
     if (eligible && !isModalDismissed(modal)) {
-      setIsPreOrderOpen(true);
       setFetchedModal(modal);
+
+      // Compute delay from toggle + unit + value
+      const delayMs = modal?.enableDisplayDelay
+        ? (Number(modal.displayDelayValue) || 0) *
+          (modal.displayDelayUnit === "minutes" ? 60000 : 1000)
+        : // fallback if older field exists
+          (Number(modal.displayDelaySeconds) || 0) * 1000;
+
+      if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
+      if (delayMs > 0) {
+        delayTimerRef.current = setTimeout(() => {
+          setIsPreOrderOpen(true);
+        }, delayMs);
+      } else {
+        setIsPreOrderOpen(true);
+      }
+    }
+
+    return () => {
+      if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
+    };
+  }, [product]);
+
+  // If product unavailable, open (still respecting configured delay if present)
+  useEffect(() => {
+    if (product && product.availableForSale === false) {
+      const m = product.preOrderModal;
+      const delayMs = m?.enableDisplayDelay
+        ? (Number(m.displayDelayValue) || 0) *
+          (m.displayDelayUnit === "minutes" ? 60000 : 1000)
+        : (Number(m?.displayDelaySeconds) || 0) * 1000;
+
+      if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
+      if (delayMs > 0) {
+        delayTimerRef.current = setTimeout(
+          () => setIsPreOrderOpen(true),
+          delayMs
+        );
+      } else {
+        setIsPreOrderOpen(true);
+      }
     }
   }, [product]);
 
@@ -149,12 +192,6 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
       console.log("Selected variant:", variant);
     }
   }, [product, selectedSize]);
-
-  useEffect(() => {
-    if (product && product.availableForSale === false) {
-      setIsPreOrderOpen(true);
-    }
-  }, [product]);
 
   // Track ViewContent event when the product data is available
   useEffect(() => {

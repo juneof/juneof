@@ -26,6 +26,11 @@ export const preOrderModal = defineType({
     },
     // sensible defaults
     showOncePerSession: true,
+
+    // NEW: delay defaults
+    enableDisplayDelay: false,
+    displayDelayUnit: "seconds",
+    displayDelayValue: 0,
   },
 
   fields: [
@@ -57,7 +62,8 @@ export const preOrderModal = defineType({
         "Exact paths where this modal should appear (e.g. '/', 'product-listing', 'product/juneof-jacket').",
       validation: (Rule) =>
         Rule.custom((slugs: any, context: any) => {
-          const allowOnPreOrderProductPages = context.document?.allowOnPreOrderProductPages;
+          const allowOnPreOrderProductPages =
+            context.document?.allowOnPreOrderProductPages;
           const hasSlugs = Array.isArray(slugs) && slugs.length > 0;
           if (!allowOnPreOrderProductPages && !hasSlugs) {
             return 'Either add at least one slug or enable "Allow on pre-order product pages".';
@@ -72,6 +78,48 @@ export const preOrderModal = defineType({
       type: "boolean",
       description: "When ON, the modal will show on pre-order product pages.",
       initialValue: false,
+    }),
+
+    // NEW: Display delay controls
+    defineField({
+      name: "enableDisplayDelay",
+      title: "Enable popup delay",
+      type: "boolean",
+      description: "When ON, show this modal after a configured delay.",
+      initialValue: false,
+    }),
+    defineField({
+      name: "displayDelayUnit",
+      title: "Delay unit",
+      type: "string",
+      options: {
+        list: [
+          { title: "Seconds", value: "seconds" },
+          { title: "Minutes", value: "minutes" },
+        ],
+        layout: "radio",
+        direction: "horizontal",
+      },
+      hidden: ({ document }: any) => !document?.enableDisplayDelay,
+      initialValue: "seconds",
+    }),
+    defineField({
+      name: "displayDelayValue",
+      title: "Delay amount",
+      type: "number",
+      description: "How long to wait before showing the modal.",
+      hidden: ({ document }: any) => !document?.enableDisplayDelay,
+      initialValue: 0,
+      validation: (Rule) =>
+        Rule.min(0)
+          .max(3600)
+          .custom((v: number | undefined, context: any) => {
+            const enabled = context?.document?.enableDisplayDelay;
+            if (enabled && (!Number.isFinite(v) || v! <= 0)) {
+              return "Delay must be greater than 0 when enabled.";
+            }
+            return true;
+          }),
     }),
 
     // Content / Copy
@@ -152,19 +200,16 @@ export const preOrderModal = defineType({
       description:
         "Unique suffix appended to the sessionStorage key. Automatically generated once on document creation.",
       initialValue: () => {
-        // use crypto.randomUUID if available for stable uniqueness
         try {
           if (
             typeof crypto !== "undefined" &&
             typeof crypto.randomUUID === "function"
           ) {
-            // crypto.randomUUID returns like '...'
             return `modal_${crypto.randomUUID()}`;
           }
         } catch {
           /* ignore */
         }
-        // fallback short id
         return `modal_${Math.random().toString(36).substring(2, 10)}`;
       },
     }),
@@ -175,7 +220,6 @@ export const preOrderModal = defineType({
       title: "Appearance",
       type: "object",
       fields: [
-        // Background
         defineField({
           name: "background",
           title: "Background",
