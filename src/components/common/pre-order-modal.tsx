@@ -61,7 +61,8 @@ function urlFor(source: any): string | null {
   }
 }
 
-const EMAIL_RE = /^\S+@\S+\.\S+$/;
+// Slightly stricter practical regex for most emails
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 export default function PreOrderModal({
   isOpen,
@@ -72,6 +73,7 @@ export default function PreOrderModal({
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   // mount guard
@@ -103,23 +105,6 @@ export default function PreOrderModal({
       document.body.style.overflow = original;
     };
   }, [isOpen, mounted]);
-
-  // close on ESC
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        handleClose();
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isOpen]
-  );
-
-  useEffect(() => {
-    if (!mounted) return;
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [mounted, handleKeyDown]);
 
   // Defensive: if no modalDetails, don't render (matches original)
   if (!modalDetails) return null;
@@ -232,18 +217,49 @@ export default function PreOrderModal({
     onClose();
   };
 
+  // close on ESC
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        handleClose();
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isOpen]
+  );
+
+  useEffect(() => {
+    if (!mounted) return;
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mounted, handleKeyDown]);
+
+  // Email change + realtime validation
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setEmail(val);
+
+    if (!val) {
+      setEmailError("Email is required");
+    } else if (!EMAIL_RE.test(val.trim())) {
+      setEmailError("Please enter a valid email address");
+    } else {
+      setEmailError(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email || !EMAIL_RE.test(email)) {
-      toast.error("Please enter a valid email");
+    if (!email || !!emailError) {
+      toast.error(emailError || "Please enter a valid email");
       return;
     }
 
     setLoading(true);
     try {
       const payload = {
-        email,
+        email: email.trim(),
         url: typeof window !== "undefined" ? window.location.href : null,
       };
 
@@ -273,6 +289,7 @@ export default function PreOrderModal({
       }
 
       setEmail("");
+      setEmailError(null);
       try {
         persistModalDismiss(modalDetails);
       } catch {}
@@ -393,14 +410,19 @@ export default function PreOrderModal({
               />
             )}
 
-            <InputGroup className="h-14 border border-black rounded-none">
+            {/* Input group: border turns red when there's an email error */}
+            <InputGroup
+              className={`h-14 rounded-none border ${
+                emailError ? "border-red-500" : "border-black"
+              }`}
+            >
               <InputGroupInput
                 id="preorder-email"
                 name="email"
                 placeholder={inputPlaceholder}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full !text-lg placeholder-gray-400"
+                onChange={handleEmailChange}
+                className={`w-full !text-lg placeholder-gray-400 focus:outline-none`}
                 aria-label="Email"
                 autoComplete="email"
                 required
@@ -408,7 +430,7 @@ export default function PreOrderModal({
               <InputGroupAddon align="inline-end">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !!emailError}
                   className="h-14 flex items-center justify-center px-5 text-base disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     backgroundColor: ctaBackground,
@@ -420,6 +442,11 @@ export default function PreOrderModal({
                 </button>
               </InputGroupAddon>
             </InputGroup>
+
+            {/* Inline error message */}
+            {emailError && (
+              <p className="text-red-600 text-xs mt-1">{emailError}</p>
+            )}
 
             <p className="text-xs text-black w-full flex flex-col items-end">
               {consentText && (
