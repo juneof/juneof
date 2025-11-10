@@ -11,6 +11,11 @@ export const preOrderModal = defineType({
   initialValue: {
     enabled: true,
     allowOnPreOrderProductPages: false,
+    showOnAllProductPages: false,
+    showOncePerSession: false,
+    enableDisplayDelay: false,
+    displayDelayUnit: "seconds",
+    displayDelayValue: 0,
     enableSchedule: false,
     priority: 0,
     ctaText: "keep me posted",
@@ -24,26 +29,16 @@ export const preOrderModal = defineType({
         ctaBackground: "#000000",
       },
     },
-    // sensible defaults
-    showOncePerSession: true,
-
-    // NEW: delay controls
-    enableDisplayDelay: false,
-    displayDelayUnit: "seconds",
-    displayDelayValue: 0,
-
-    // NEW: show on all product pages
-    showOnAllProductPages: false,
   },
 
   fields: [
-    // Identification & targeting
+    // Identification & Targeting
     defineField({
       name: "modalName",
       title: "Modal name (Studio only)",
       type: "string",
       description:
-        "Internal name for identifying the modal inside Sanity Studio.",
+        "Internal label used to identify this modal inside Sanity Studio. Not visible to users.",
       validation: (Rule) => Rule.required().max(80),
     }),
 
@@ -51,18 +46,18 @@ export const preOrderModal = defineType({
       name: "enabled",
       title: "Enabled",
       type: "boolean",
-      description: "Toggle modal visibility on/off.",
+      description:
+        "Toggle to show or hide this modal on the website. When off, it will never appear.",
       initialValue: true,
     }),
 
-    // Slugs: require at least one targeting method (slugs OR allowOnPreOrderProductPages OR showOnAllProductPages)
     defineField({
       name: "slugs",
       title: "Specific page slugs / paths",
       type: "array",
       of: [{ type: "string" }],
       description:
-        "Exact paths where this modal should appear (e.g. '/', 'product-listing', 'product/juneof-jacket').",
+        "Enter exact URL paths where this modal should appear. Example: '/', 'product/juneof-jacket'. Required unless you enable global options below.",
       validation: (Rule) =>
         Rule.custom((slugs: any, context: any) => {
           const allowOnPreOrderProductPages =
@@ -82,29 +77,62 @@ export const preOrderModal = defineType({
 
     defineField({
       name: "allowOnPreOrderProductPages",
-      title: "Allow on pre-order product pages",
+      title: "Show on pre-order product pages",
       type: "boolean",
       description:
-        "When ON, the modal will show on pre-order (unavailable) product pages.",
+        "When enabled, this modal appears automatically on pre-order or unavailable product pages.",
       initialValue: false,
     }),
 
-    // NEW: Show on ALL product pages
     defineField({
       name: "showOnAllProductPages",
       title: "Show on all product pages",
       type: "boolean",
       description:
-        "When ON, this modal is eligible to appear on every product page (regardless of availability).",
+        "When enabled, this modal appears on every product page, regardless of availability or slug.",
       initialValue: false,
     }),
 
-    // NEW: Display delay controls
+    // Session behavior
+    defineField({
+      name: "showOncePerSession",
+      title: "Show only once per session",
+      type: "boolean",
+      description:
+        "If enabled, this modal shows only once per browser session (sessionStorage). Turn off to allow it to reappear multiple times.",
+      initialValue: true,
+    }),
+
+    defineField({
+      name: "showOnceSessionKeySuffix",
+      title: "Session key suffix (auto-generated)",
+      type: "string",
+      readOnly: true,
+      description:
+        "Automatically generated unique ID used to track whether this modal has already shown in the current session.",
+      initialValue: () => {
+        try {
+          if (
+            typeof crypto !== "undefined" &&
+            typeof crypto.randomUUID === "function"
+          ) {
+            return `modal_${crypto.randomUUID()}`;
+          }
+        } catch {
+          /* ignore */
+        }
+        return `modal_${Math.random().toString(36).substring(2, 10)}`;
+      },
+      hidden: ({ document }: any) => !document?.showOncePerSession,
+    }),
+
+    // Display delay
     defineField({
       name: "enableDisplayDelay",
       title: "Enable popup delay",
       type: "boolean",
-      description: "When ON, show this modal after a configured delay.",
+      description:
+        "When enabled, the modal will appear after a short delay (seconds or minutes) instead of instantly.",
       initialValue: false,
     }),
     defineField({
@@ -121,12 +149,14 @@ export const preOrderModal = defineType({
       },
       hidden: ({ document }: any) => !document?.enableDisplayDelay,
       initialValue: "seconds",
+      description: "Select whether to measure delay in seconds or minutes.",
     }),
     defineField({
       name: "displayDelayValue",
       title: "Delay amount",
       type: "number",
-      description: "How long to wait before showing the modal.",
+      description:
+        "Number of seconds or minutes to wait before showing the modal. Must be greater than 0 when delay is enabled.",
       hidden: ({ document }: any) => !document?.enableDisplayDelay,
       initialValue: 0,
       validation: (Rule) =>
@@ -134,29 +164,92 @@ export const preOrderModal = defineType({
           .max(3600)
           .custom((v: number | undefined, context: any) => {
             const enabled = context?.document?.enableDisplayDelay;
-            if (enabled && (typeof v !== "number" || !Number.isFinite(v) || v <= 0)) {
+            if (
+              enabled &&
+              (typeof v !== "number" || !Number.isFinite(v) || v <= 0)
+            ) {
               return "Delay must be greater than 0 when enabled.";
             }
             return true;
           }),
     }),
 
-    // Content / Copy
+    // Scheduling
+    defineField({
+      name: "enableSchedule",
+      title: "Enable start/end scheduling",
+      type: "boolean",
+      description:
+        "Turn on to schedule this modal to appear only between specific start and end dates.",
+      initialValue: false,
+    }),
+    defineField({
+      name: "startAt",
+      title: "Show start (date & time)",
+      type: "datetime",
+      description:
+        "Date and time when the modal should start appearing. Active only if scheduling is enabled.",
+      hidden: ({ document }: any) => !document?.enableSchedule,
+    }),
+    defineField({
+      name: "endAt",
+      title: "Show end (date & time)",
+      type: "datetime",
+      description:
+        "Date and time when the modal should stop appearing. Must be after the start time.",
+      hidden: ({ document }: any) => !document?.enableSchedule,
+      validation: (Rule) =>
+        Rule.custom((endAt: string | undefined, context: any) => {
+          if (!endAt) return true;
+          const { document } = context;
+          const start = document?.startAt ? new Date(document.startAt) : null;
+          const end = new Date(endAt);
+          if (!start) return true;
+          return end > start
+            ? true
+            : "End date/time must be after start date/time";
+        }),
+    }),
+
+    // Priority
+    defineField({
+      name: "priority",
+      title: "Priority",
+      type: "number",
+      description:
+        "Used when multiple modals are eligible for the same page. Higher values take precedence.",
+      initialValue: 0,
+    }),
+
+    // Content
     defineField({
       name: "discountPercent",
       title: "Discount percent",
       type: "number",
+      description:
+        "Optional numeric value to show a discount percentage (e.g. 15 = '15% off').",
       validation: (Rule) => Rule.min(0).max(100),
     }),
-    defineField({ name: "heading", title: "Heading", type: "string" }),
-    defineField({ name: "subHeading", title: "Sub-heading", type: "text" }),
+    defineField({
+      name: "heading",
+      title: "Heading",
+      type: "string",
+      description: "Main title or headline shown on the modal.",
+    }),
+    defineField({
+      name: "subHeading",
+      title: "Sub-heading",
+      type: "text",
+      description:
+        "Supporting line or tagline that appears below the main heading.",
+    }),
 
     defineField({
       name: "introText",
       title: "Intro text (above input)",
       type: "text",
       description:
-        "Small lead-in line above the email input (e.g. 'Need time? We're more than happy to spill all the tea').",
+        "Short introductory line above the email input. Example: 'Need time? We're more than happy to spill all the tea'.",
       initialValue: "Need time? We're more than happy to spill all the tea",
     }),
 
@@ -165,7 +258,7 @@ export const preOrderModal = defineType({
       title: "Input placeholder",
       type: "string",
       description:
-        "Placeholder text displayed inside the email input (e.g. 'drop your email').",
+        "Placeholder text shown inside the email input. Example: 'drop your email'.",
       initialValue: "drop your email",
     }),
 
@@ -174,7 +267,7 @@ export const preOrderModal = defineType({
       title: "Consent text (main)",
       type: "text",
       description:
-        "Main consent text shown below the input (first line). Use plain text or small HTML if you allow links.",
+        "Main consent text shown below the input. You can include simple HTML (like links). Example: 'By completing this form, you agree to receive our emails.'",
       initialValue:
         "By completing this form, you are signing up to receive our emails and can unsubscribe anytime.",
     }),
@@ -183,7 +276,8 @@ export const preOrderModal = defineType({
       name: "consentSubText",
       title: "Consent subtext (secondary)",
       type: "string",
-      description: "Secondary consent line (e.g. '(But it won't spam you)')",
+      description:
+        "Optional secondary line shown below the consent text. Example: '(But it won't spam you)'.",
       initialValue: "(But it won't spam you)",
     }),
 
@@ -191,6 +285,8 @@ export const preOrderModal = defineType({
       name: "ctaText",
       title: "CTA button text",
       type: "string",
+      description:
+        "Text for the main call-to-action button. Example: 'Keep me posted'.",
       initialValue: "keep me posted",
     }),
 
@@ -198,39 +294,8 @@ export const preOrderModal = defineType({
       name: "productSpecificMessage",
       title: "Product-specific message",
       type: "text",
-    }),
-
-    // Session behavior controls
-    defineField({
-      name: "showOncePerSession",
-      title: "Show only once per session",
-      type: "boolean",
       description:
-        "When ON, this modal will only be displayed once per browser session (sessionStorage). Editors can disable this to allow repeated displays.",
-      initialValue: true,
-    }),
-
-    // Auto-generated session suffix (readOnly)
-    defineField({
-      name: "showOnceSessionKeySuffix",
-      title: "Session key suffix (auto-generated)",
-      type: "string",
-      readOnly: true,
-      description:
-        "Unique suffix appended to the sessionStorage key. Automatically generated once on document creation.",
-      initialValue: () => {
-        try {
-          if (
-            typeof crypto !== "undefined" &&
-            typeof crypto.randomUUID === "function"
-          ) {
-            return `modal_${crypto.randomUUID()}`;
-          }
-        } catch {
-          /* ignore */
-        }
-        return `modal_${Math.random().toString(36).substring(2, 10)}`;
-      },
+        "Optional message displayed only on product pages, e.g. 'This product will be available soon!'.",
     }),
 
     // Appearance
@@ -238,12 +303,15 @@ export const preOrderModal = defineType({
       name: "appearance",
       title: "Appearance",
       type: "object",
+      description:
+        "Customize how the modal looks — choose background color/image and set text and button colors.",
       fields: [
-        // Background
         defineField({
           name: "background",
           title: "Background",
           type: "object",
+          description:
+            "Set the modal’s background — solid color, image, or transparent.",
           fields: [
             defineField({
               name: "type",
@@ -263,6 +331,7 @@ export const preOrderModal = defineType({
               name: "color",
               title: "Background color (CSS)",
               type: "string",
+              description: "Pick a background color (e.g. '#F2EDD8').",
               hidden: ({ parent }: any) => parent?.type !== "color",
             }),
 
@@ -271,6 +340,8 @@ export const preOrderModal = defineType({
               title: "Desktop background image",
               type: "image",
               options: { hotspot: true },
+              description:
+                "Upload an image background for desktop screens. Only used if background type = 'image'.",
               hidden: ({ parent }: any) => parent?.type !== "image",
             }),
             defineField({
@@ -278,6 +349,8 @@ export const preOrderModal = defineType({
               title: "Mobile background image",
               type: "image",
               options: { hotspot: true },
+              description:
+                "Upload a mobile-optimized version of the background image. Only used if background type = 'image'.",
               hidden: ({ parent }: any) => parent?.type !== "image",
             }),
 
@@ -285,6 +358,8 @@ export const preOrderModal = defineType({
               name: "overlayOpacity",
               title: "Overlay opacity (0-1)",
               type: "number",
+              description:
+                "Adjust overlay transparency (0 = none, 1 = fully dark). Improves text readability over images.",
               hidden: ({ parent }: any) => parent?.type !== "image",
               validation: (Rule) => Rule.min(0).max(1),
             }),
@@ -295,54 +370,37 @@ export const preOrderModal = defineType({
           name: "textColors",
           title: "Text colors",
           type: "object",
+          description:
+            "Set colors for text, headings, and button elements inside the modal.",
           fields: [
-            defineField({ name: "title", type: "string" }),
-            defineField({ name: "subHeading", type: "string" }),
-            defineField({ name: "body", type: "string" }),
-            defineField({ name: "ctaText", type: "string" }),
-            defineField({ name: "ctaBackground", type: "string" }),
+            defineField({
+              name: "title",
+              type: "string",
+              title: "Title color",
+            }),
+            defineField({
+              name: "subHeading",
+              type: "string",
+              title: "Sub-heading color",
+            }),
+            defineField({
+              name: "body",
+              type: "string",
+              title: "Body text color",
+            }),
+            defineField({
+              name: "ctaText",
+              type: "string",
+              title: "CTA text color",
+            }),
+            defineField({
+              name: "ctaBackground",
+              type: "string",
+              title: "CTA background color",
+            }),
           ],
         }),
       ],
-    }),
-
-    // Scheduling
-    defineField({
-      name: "enableSchedule",
-      title: "Enable start/end scheduling",
-      type: "boolean",
-      initialValue: false,
-    }),
-    defineField({
-      name: "startAt",
-      title: "Show start (date & time)",
-      type: "datetime",
-      hidden: ({ document }: any) => !document?.enableSchedule,
-    }),
-    defineField({
-      name: "endAt",
-      title: "Show end (date & time)",
-      type: "datetime",
-      hidden: ({ document }: any) => !document?.enableSchedule,
-      validation: (Rule) =>
-        Rule.custom((endAt: string | undefined, context: any) => {
-          if (!endAt) return true;
-          const { document } = context;
-          const start = document?.startAt ? new Date(document.startAt) : null;
-          const end = new Date(endAt);
-          if (!start) return true;
-          return end > start
-            ? true
-            : "End date/time must be after start date/time";
-        }),
-    }),
-
-    // Meta
-    defineField({
-      name: "priority",
-      title: "Priority",
-      type: "number",
-      initialValue: 0,
     }),
   ],
 

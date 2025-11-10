@@ -213,7 +213,6 @@ export default function PreOrderModal({
       overlayOpacity: overlay,
     };
     // note: intentionally omit modalDetails from deps to keep stable; we only read it initially
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalDetails, isMobile]);
 
   const discountBlock =
