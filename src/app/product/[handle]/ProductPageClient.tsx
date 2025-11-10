@@ -117,25 +117,25 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
 
     const eligible = isModalEligible({
       modal,
-      productHandle: product.handle,
+      productHandle: product.handle, // present => product page
       productAvailable: Boolean(product.availableForSale),
     });
 
     if (eligible && !isModalDismissed(modal)) {
       setFetchedModal(modal);
 
-      // Compute delay from toggle + unit + value
+      // Delay from toggle + unit + value (fallback to legacy seconds if present)
       const delayMs = modal?.enableDisplayDelay
         ? (Number(modal.displayDelayValue) || 0) *
           (modal.displayDelayUnit === "minutes" ? 60000 : 1000)
-        : // fallback if older field exists
-          (Number(modal.displayDelaySeconds) || 0) * 1000;
+        : (Number(modal.displayDelaySeconds) || 0) * 1000;
 
       if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
       if (delayMs > 0) {
-        delayTimerRef.current = setTimeout(() => {
-          setIsPreOrderOpen(true);
-        }, delayMs);
+        delayTimerRef.current = setTimeout(
+          () => setIsPreOrderOpen(true),
+          delayMs
+        );
       } else {
         setIsPreOrderOpen(true);
       }

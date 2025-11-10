@@ -27,10 +27,13 @@ export const preOrderModal = defineType({
     // sensible defaults
     showOncePerSession: true,
 
-    // NEW: delay defaults
+    // NEW: delay controls
     enableDisplayDelay: false,
     displayDelayUnit: "seconds",
     displayDelayValue: 0,
+
+    // NEW: show on all product pages
+    showOnAllProductPages: false,
   },
 
   fields: [
@@ -52,7 +55,7 @@ export const preOrderModal = defineType({
       initialValue: true,
     }),
 
-    // Slugs: require at least one targeting method (slugs OR allowOnPreOrderProductPages)
+    // Slugs: require at least one targeting method (slugs OR allowOnPreOrderProductPages OR showOnAllProductPages)
     defineField({
       name: "slugs",
       title: "Specific page slugs / paths",
@@ -64,9 +67,14 @@ export const preOrderModal = defineType({
         Rule.custom((slugs: any, context: any) => {
           const allowOnPreOrderProductPages =
             context.document?.allowOnPreOrderProductPages;
+          const showOnAllProductPages = context.document?.showOnAllProductPages;
           const hasSlugs = Array.isArray(slugs) && slugs.length > 0;
-          if (!allowOnPreOrderProductPages && !hasSlugs) {
-            return 'Either add at least one slug or enable "Allow on pre-order product pages".';
+          if (
+            !allowOnPreOrderProductPages &&
+            !showOnAllProductPages &&
+            !hasSlugs
+          ) {
+            return 'Provide slugs OR enable "Allow on pre-order product pages" OR "Show on all product pages".';
           }
           return true;
         }),
@@ -76,7 +84,18 @@ export const preOrderModal = defineType({
       name: "allowOnPreOrderProductPages",
       title: "Allow on pre-order product pages",
       type: "boolean",
-      description: "When ON, the modal will show on pre-order product pages.",
+      description:
+        "When ON, the modal will show on pre-order (unavailable) product pages.",
+      initialValue: false,
+    }),
+
+    // NEW: Show on ALL product pages
+    defineField({
+      name: "showOnAllProductPages",
+      title: "Show on all product pages",
+      type: "boolean",
+      description:
+        "When ON, this modal is eligible to appear on every product page (regardless of availability).",
       initialValue: false,
     }),
 
@@ -115,7 +134,7 @@ export const preOrderModal = defineType({
           .max(3600)
           .custom((v: number | undefined, context: any) => {
             const enabled = context?.document?.enableDisplayDelay;
-            if (enabled && (!Number.isFinite(v) || v! <= 0)) {
+            if (enabled && (typeof v !== "number" || !Number.isFinite(v) || v <= 0)) {
               return "Delay must be greater than 0 when enabled.";
             }
             return true;
@@ -220,6 +239,7 @@ export const preOrderModal = defineType({
       title: "Appearance",
       type: "object",
       fields: [
+        // Background
         defineField({
           name: "background",
           title: "Background",

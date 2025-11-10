@@ -3,7 +3,7 @@ import { client } from "@/sanity/lib/client";
 
 /**
  * Fetches the most relevant pre-order modal for a product handle or slug.
- * - Matches by slug, handle, or allowOnPreOrderProductPages.
+ * - Matches by slug, handle, allowOnPreOrderProductPages, or showOnAllProductPages.
  * - Applies schedule only if enableSchedule is true.
  * - Returns the top-priority active modal.
  */
@@ -31,6 +31,7 @@ export async function fetchModalForProductHandle(
       count(slugs[ @ in $variants ]) > 0
       || ($handle != null && $handle in showOnProductHandles[])
       || allowOnPreOrderProductPages == true
+      || showOnAllProductPages == true
     )
     && (
       !defined(enableSchedule) || enableSchedule == false

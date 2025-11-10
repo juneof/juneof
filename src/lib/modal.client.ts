@@ -32,9 +32,9 @@ function slugArrayIncludes(slugs: any[] | undefined, value: string) {
 /**
  * Client-side eligibility check.
  *
- * - Matches by slugs OR showOnProductHandles OR allowOnPreOrderProductPages.
+ * - Matches by slugs OR showOnProductHandles OR allowOnPreOrderProductPages OR showOnAllProductPages.
  * - Only enforces startAt/endAt when enableSchedule === true.
- * - Optionally prevents showing for available products.
+ * - Optionally prevents showing for available products (only for pre-order targeting).
  */
 export function isModalEligible({
   modal,
@@ -54,8 +54,13 @@ export function isModalEligible({
     Array.isArray(modal.showOnProductHandles) &&
     modal.showOnProductHandles.length > 0;
 
-  // slug match (covers homepage)
-  if (hasSlugs) {
+  // NEW: Global targeting for product pages
+  if (modal.showOnAllProductPages === true) {
+    // Must be on a product page (have a handle)
+    if (!productHandle) return false;
+    // Targeting satisfied, proceed to schedule checks below
+  } else if (hasSlugs) {
+    // slug match (covers homepage)
     const variants = buildSlugVariants(slug || "");
     const matched = variants.some((v) =>
       slugArrayIncludes(modal.slugs, String(v))
@@ -88,8 +93,16 @@ export function isModalEligible({
     return false;
   }
 
-  // optional: don't show for available products
-  if (typeof productAvailable === "boolean" && productAvailable) return false;
+  // Only suppress available products when modal is explicitly pre-order targeted,
+  // not when it's configured for all product pages.
+  if (
+    modal.showOnAllProductPages !== true &&
+    modal.allowOnPreOrderProductPages === true &&
+    typeof productAvailable === "boolean" &&
+    productAvailable
+  ) {
+    return false;
+  }
 
   return true;
 }

@@ -20,6 +20,9 @@ import {
   isModalEligible,
 } from "@/lib/modal.client";
 
+/* ----------------------
+   Types & Context
+   ---------------------- */
 type SanityModal = any;
 
 interface ModalContextType {
@@ -37,22 +40,31 @@ export function useGlobalModal() {
   return ctx;
 }
 
+/* ----------------------
+   Helpers
+   ---------------------- */
 function detectPageInfo(pathname: string | null | undefined) {
-  if (!pathname || pathname === "/") return { slug: "/", handle: null };
+  if (!pathname || pathname === "/")
+    return { slug: "/", handle: null, isProductPage: false };
   const normalized = pathname.replace(/^\/+|\/+$/g, "");
   const parts = normalized.split("/").filter(Boolean);
   if (parts[0] === "product" && parts[1]) {
-    return { slug: normalized, handle: parts[1] };
+    return { slug: normalized, handle: parts[1], isProductPage: true };
   }
-  return { slug: normalized, handle: null };
+  return { slug: normalized, handle: null, isProductPage: false };
 }
 
+/* ----------------------
+   Fetch modal for route
+   ---------------------- */
 async function fetchModalForRoute({
   slug,
   handle,
+  isProductPage,
 }: {
   slug: string;
   handle?: string | null;
+  isProductPage: boolean;
 }) {
   const baseSelect = `{
     _id, modalName, title, enabled, allowOnPreOrderProductPages,
@@ -63,8 +75,9 @@ async function fetchModalForRoute({
     ctaText, heading, subHeading,
     discountPercent, productSpecificMessage,
     appearance, priority, _createdAt,
-    // NEW: delay fields
-    enableDisplayDelay, displayDelayUnit, displayDelayValue
+    // delay + targeting
+    enableDisplayDelay, displayDelayUnit, displayDelayValue,
+    showOnAllProductPages
   }`;
 
   const normalized = (slug ?? "").replace(/^\/+|\/+$/g, "");
@@ -83,7 +96,9 @@ async function fetchModalForRoute({
     enabled == true &&
     (
       count(slugs[@ in $variants]) > 0 ||
-      ($handle != null && $handle in showOnProductHandles[])
+      ($handle != null && $handle in showOnProductHandles[]) ||
+      ($isProductPage == true && showOnAllProductPages == true) ||
+      ($isProductPage == true && allowOnPreOrderProductPages == true)
     ) &&
     (
       !defined(enableSchedule) || enableSchedule == false ||
@@ -96,7 +111,11 @@ async function fetchModalForRoute({
   ] | order(priority desc, _createdAt desc)[0] ${baseSelect}`;
 
   try {
-    const modal = await sanityClient.fetch(query, { variants, handle });
+    const modal = await sanityClient.fetch(query, {
+      variants,
+      handle,
+      $isProductPage: isProductPage,
+    });
     return modal || null;
   } catch (err) {
     console.error("fetchModalForRoute error:", err);
@@ -104,6 +123,9 @@ async function fetchModalForRoute({
   }
 }
 
+/* ----------------------
+   ModalProvider Inner Component (wrapped in Suspense)
+   ---------------------- */
 function ModalProviderInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -111,9 +133,6 @@ function ModalProviderInner() {
   const [isOpen, setIsOpen] = useState(false);
   const [modalData, setModalData] = useState<SanityModal | null>(null);
   const [productData, setProductData] = useState<any | null>(null);
-  const [delayTimer, setDelayTimer] = useState<ReturnType<
-    typeof setTimeout
-  > | null>(null);
 
   const openModal = useCallback((modal: SanityModal, product?: any) => {
     setModalData(modal);
@@ -135,11 +154,12 @@ function ModalProviderInner() {
 
   useEffect(() => {
     let mounted = true;
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function load() {
       try {
-        const { slug, handle } = detectPageInfo(pathname);
-        const modal = await fetchModalForRoute({ slug, handle });
+        const { slug, handle, isProductPage } = detectPageInfo(pathname);
+        const modal = await fetchModalForRoute({ slug, handle, isProductPage });
 
         if (!mounted) return;
         if (!modal) {
@@ -164,6 +184,7 @@ function ModalProviderInner() {
           modal,
           slug,
           productHandle: handle || null,
+          // product availability is unknown here; eligibility will not suppress unless required
           productAvailable: undefined,
         });
 
@@ -173,7 +194,7 @@ function ModalProviderInner() {
           return;
         }
 
-        // Apply delay (toggle + unit + value)
+        // Delay (toggle + unit + value)
         const delayMs = modal?.enableDisplayDelay
           ? (Number(modal.displayDelayValue) || 0) *
             (modal.displayDelayUnit === "minutes" ? 60000 : 1000)
@@ -185,11 +206,10 @@ function ModalProviderInner() {
         if (delayTimer) clearTimeout(delayTimer);
 
         if (delayMs > 0) {
-          const t = setTimeout(() => {
+          delayTimer = setTimeout(() => {
             if (!mounted) return;
             setIsOpen(true);
           }, delayMs);
-          setDelayTimer(t);
         } else {
           setIsOpen(true);
         }
@@ -203,7 +223,6 @@ function ModalProviderInner() {
       mounted = false;
       if (delayTimer) clearTimeout(delayTimer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, searchParams]);
 
   return (
@@ -220,6 +239,9 @@ function ModalProviderInner() {
   );
 }
 
+/* ----------------------
+   Exported Provider (with Suspense wrapper)
+   ---------------------- */
 export function ModalProvider({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={null}>
