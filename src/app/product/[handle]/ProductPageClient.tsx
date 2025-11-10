@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -23,12 +22,6 @@ import {
   getSizeAvailabilityStatus,
   type ShopifyProductVariant,
 } from "@/lib/shopify";
-import PreOrderModal from "@/components/common/pre-order-modal";
-import {
-  isModalDismissed,
-  isModalEligible,
-  persistModalDismiss,
-} from "@/lib/modal.client";
 
 // Mobile detection hook
 const useIsMobile = () => {
@@ -87,7 +80,6 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
     useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isProfileCompletionOpen, setIsProfileCompletionOpen] = useState(false);
-  const [isPreOrderOpen, setIsPreOrderOpen] = useState<boolean>(false);
 
   // Add state for dynamic express interest checking
   const [currentExpressInterest, setCurrentExpressInterest] = useState(
@@ -104,68 +96,43 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
   const { refreshProfileStatus } = useProfileCompletion();
   const isMobile = useIsMobile();
   const imageGalleryRef = useRef<HTMLDivElement>(null);
-  const [fetchedModal, setFetchedModal] = useState<any | null>(null);
-
-  const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const searchParams = useSearchParams();
 
-  // Delay-aware modal open for server-fetched preOrderModal
+  // Tell the GlobalModalProvider about this product's handle and availability
   useEffect(() => {
-    if (!product?.preOrderModal) return;
-    const modal = product.preOrderModal;
+    if (!product?.handle) return;
 
-    const eligible = isModalEligible({
-      modal,
-      productHandle: product.handle, // present => product page
-      productAvailable: Boolean(product.availableForSale),
+    console.info("[ProductPageClient] Dispatching product context:", {
+      handle: product.handle,
+      availableForSale: product.availableForSale,
     });
 
-    if (eligible && !isModalDismissed(modal)) {
-      setFetchedModal(modal);
+    // Send immediately on mount/update
+    window.dispatchEvent(
+      new CustomEvent("preorder:product-context", {
+        detail: {
+          handle: product.handle,
+          availableForSale: Boolean(product.availableForSale),
+        },
+      })
+    );
 
-      // Delay from toggle + unit + value (fallback to legacy seconds if present)
-      const delayMs = modal?.enableDisplayDelay
-        ? (Number(modal.displayDelayValue) || 0) *
-          (modal.displayDelayUnit === "minutes" ? 60000 : 1000)
-        : (Number(modal.displayDelaySeconds) || 0) * 1000;
-
-      if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
-      if (delayMs > 0) {
-        delayTimerRef.current = setTimeout(
-          () => setIsPreOrderOpen(true),
-          delayMs
-        );
-      } else {
-        setIsPreOrderOpen(true);
-      }
+    // Respond to provider handshake requests
+    function onRequest() {
+      window.dispatchEvent(
+        new CustomEvent("preorder:product-context", {
+          detail: {
+            handle: product.handle,
+            availableForSale: Boolean(product.availableForSale),
+          },
+        })
+      );
     }
-
-    return () => {
-      if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
-    };
-  }, [product]);
-
-  // If product unavailable, open (still respecting configured delay if present)
-  useEffect(() => {
-    if (product && product.availableForSale === false) {
-      const m = product.preOrderModal;
-      const delayMs = m?.enableDisplayDelay
-        ? (Number(m.displayDelayValue) || 0) *
-          (m.displayDelayUnit === "minutes" ? 60000 : 1000)
-        : (Number(m?.displayDelaySeconds) || 0) * 1000;
-
-      if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
-      if (delayMs > 0) {
-        delayTimerRef.current = setTimeout(
-          () => setIsPreOrderOpen(true),
-          delayMs
-        );
-      } else {
-        setIsPreOrderOpen(true);
-      }
-    }
-  }, [product]);
+    window.addEventListener("preorder:request-product-context", onRequest);
+    return () =>
+      window.removeEventListener("preorder:request-product-context", onRequest);
+  }, [product?.handle, product?.availableForSale]);
 
   // NEW: Initialize available sizes from Shopify variants
   useEffect(() => {
@@ -794,20 +761,6 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
             isProcessingCompletion.current = false;
           }}
         />
-
-        <PreOrderModal
-          isOpen={isPreOrderOpen}
-          onClose={() => {
-            if (fetchedModal) persistModalDismiss(fetchedModal);
-            setIsPreOrderOpen(false);
-          }}
-          product={{
-            id: product.id,
-            title: product.title,
-            handle: product.handle,
-          }}
-          modalDetails={product.preOrderModal} // ✅ Pass Sanity modal here
-        />
       </>
     );
   }
@@ -832,7 +785,7 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
               }}
             />
 
-            {!expressInterest && (
+            {!currentExpressInterest && (
               <span className="text-xl font-medium">
                 {formatPrice(price, currencyCode)}
               </span>
@@ -840,7 +793,7 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
           </div>
 
           {/* Fabric & Wash Care Button - At the bottom */}
-          {product.washCareGuide?.content && !expressInterest && (
+          {product.washCareGuide?.content && !currentExpressInterest && (
             <div className="mt-auto">
               <button
                 onClick={() => setIsWashCareOpen(true)}
@@ -920,7 +873,7 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
               </button>
             )}
 
-            {!expressInterest && (
+            {!currentExpressInterest && (
               <>
                 {/* Divider */}
                 <div className="h-px bg-gray-300 w-full"></div>
@@ -965,7 +918,7 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
           {/* Add to Cart Button */}
           <div className="mt-auto">
             {/* Express Interest Banner - positioned above button */}
-            {expressInterest && (
+            {currentExpressInterest && (
               <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg mb-4">
                 <p className="text-sm text-gray-700 tracking-wide lowercase leading-relaxed text-justify">
                   we&apos;re working on bringing you this product as soon as
@@ -978,17 +931,17 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
             <button
               className="w-full border border-gray-900 py-3 text-center text-base tracking-widest hover:bg-gray-100 transition-colors lowercase disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={
-                expressInterest ? handleExpressInterest : handleAddToCart
+                currentExpressInterest ? handleExpressInterest : handleAddToCart
               }
               disabled={
                 isExpressInterestLoading ||
-                (!expressInterest &&
+                (!currentExpressInterest &&
                   (!selectedSize ||
                     selectedSize.trim() === "" ||
                     !selectedVariant?.availableForSale))
               }
             >
-              {expressInterest
+              {currentExpressInterest
                 ? isExpressInterestLoading
                   ? "submitting..."
                   : "express interest!"
@@ -1063,20 +1016,6 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
           });
           isProcessingCompletion.current = false;
         }}
-      />
-
-      <PreOrderModal
-        isOpen={isPreOrderOpen}
-        onClose={() => {
-          if (fetchedModal) persistModalDismiss(fetchedModal);
-          setIsPreOrderOpen(false);
-        }}
-        product={{
-          id: product.id,
-          title: product.title,
-          handle: product.handle,
-        }}
-        modalDetails={product.preOrderModal} // ✅ Pass Sanity modal here
       />
     </>
   );

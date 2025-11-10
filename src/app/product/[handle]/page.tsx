@@ -14,8 +14,8 @@ import {
   extractProductId,
   ProductWithGuides,
 } from "@/lib/sanity-queries";
-import ProductPageClient from "./ProductPageClient";
 import { fetchModalForProductHandle } from "@/lib/modal.server";
+import ProductPageClient from "./ProductPageClient";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60;
@@ -146,7 +146,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       ...product,
       washCareGuide,
       sizeGuide,
-      preOrderModal,
+      preOrderModal, // note: Global provider handles showing; this remains available if needed
     };
 
     console.log(

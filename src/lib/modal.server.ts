@@ -6,9 +6,13 @@ import { client } from "@/sanity/lib/client";
  * - Matches by slug, handle, allowOnPreOrderProductPages, or showOnAllProductPages.
  * - Applies schedule only if enableSchedule is true.
  * - Returns the top-priority active modal.
+ *
+ * @param handleOrSlug product handle or slug
+ * @param isProductPage optional boolean indicating whether the request is for a product page (defaults to false)
  */
 export async function fetchModalForProductHandle(
-  handleOrSlug: string
+  handleOrSlug: string,
+  isProductPage: boolean = false
 ): Promise<any | null> {
   if (!handleOrSlug) return null;
 
@@ -28,10 +32,10 @@ export async function fetchModalForProductHandle(
     _type == "preOrderModal"
     && enabled == true
     && (
-      count(slugs[ @ in $variants ]) > 0
+      count(slugs[@ in $variants]) > 0
       || ($handle != null && $handle in showOnProductHandles[])
-      || allowOnPreOrderProductPages == true
-      || showOnAllProductPages == true
+      || ($isProductPage == true && allowOnPreOrderProductPages == true)
+      || ($isProductPage == true && showOnAllProductPages == true)
     )
     && (
       !defined(enableSchedule) || enableSchedule == false
@@ -45,7 +49,12 @@ export async function fetchModalForProductHandle(
 
   try {
     const handle = normalized || null;
-    const modal = await client.fetch(query, { variants, handle });
+    // Important: provide all variables referenced in the query ($variants, $handle, $isProductPage)
+    const modal = await client.fetch(query, {
+      variants,
+      handle,
+      isProductPage,
+    });
     return modal || null;
   } catch (err) {
     console.error("fetchModalForProductHandle error:", err);

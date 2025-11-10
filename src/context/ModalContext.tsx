@@ -20,9 +20,6 @@ import {
   isModalEligible,
 } from "@/lib/modal.client";
 
-/* ----------------------
-   Types & Context
-   ---------------------- */
 type SanityModal = any;
 
 interface ModalContextType {
@@ -40,34 +37,43 @@ export function useGlobalModal() {
   return ctx;
 }
 
-/* ----------------------
-   Helpers
-   ---------------------- */
 function detectPageInfo(pathname: string | null | undefined) {
   if (!pathname || pathname === "/")
-    return { slug: "/", handle: null, isProductPage: false };
+    return { slug: "/", handle: null, routeIsProductPage: false };
   const normalized = pathname.replace(/^\/+|\/+$/g, "");
   const parts = normalized.split("/").filter(Boolean);
   if (parts[0] === "product" && parts[1]) {
-    return { slug: normalized, handle: parts[1], isProductPage: true };
+    return { slug: normalized, handle: parts[1], routeIsProductPage: true };
   }
-  return { slug: normalized, handle: null, isProductPage: false };
+  return { slug: normalized, handle: null, routeIsProductPage: false };
 }
 
-/* ----------------------
-   Fetch modal for route
-   ---------------------- */
+function buildVariants(slug: string) {
+  const normalized = slug.replace(/^\/+|\/+$/g, "");
+  const set = new Set<string>();
+  set.add(slug);
+  if (normalized) {
+    set.add(normalized);
+    set.add(`/${normalized}`);
+    set.add(`product/${normalized}`);
+  } else {
+    set.add("/");
+  }
+  return Array.from(set);
+}
+
 async function fetchModalForRoute({
   slug,
   handle,
-  isProductPage,
+  routeIsProductPage,
 }: {
   slug: string;
   handle?: string | null;
-  isProductPage: boolean;
+  routeIsProductPage: boolean;
 }) {
   const baseSelect = `{
-    _id, modalName, title, enabled, allowOnPreOrderProductPages,
+    _id, modalName, title, enabled,
+    allowOnPreOrderProductPages, showOnAllProductPages,
     enableSchedule, startAt, endAt,
     enableDismissDuration, dismissDurationDays,
     showOncePerSession, showOnceSessionKeySuffix,
@@ -75,21 +81,10 @@ async function fetchModalForRoute({
     ctaText, heading, subHeading,
     discountPercent, productSpecificMessage,
     appearance, priority, _createdAt,
-    // delay + targeting
-    enableDisplayDelay, displayDelayUnit, displayDelayValue,
-    showOnAllProductPages
+    enableDisplayDelay, displayDelayUnit, displayDelayValue
   }`;
 
-  const normalized = (slug ?? "").replace(/^\/+|\/+$/g, "");
-  const variants = [
-    slug,
-    normalized,
-    normalized ? `/${normalized}` : "/",
-    normalized ? `${normalized}` : "/",
-    normalized ? `product/${normalized}` : "/",
-  ]
-    .filter(Boolean)
-    .filter((v, i, arr) => arr.indexOf(v) === i);
+  const variants = buildVariants(slug);
 
   const query = `*[
     _type == "preOrderModal" &&
@@ -114,18 +109,20 @@ async function fetchModalForRoute({
     const modal = await sanityClient.fetch(query, {
       variants,
       handle,
-      $isProductPage: isProductPage,
+      isProductPage: routeIsProductPage,
     });
     return modal || null;
   } catch (err) {
-    console.error("fetchModalForRoute error:", err);
+    console.error("[GlobalModalProvider] fetchModalForRoute error:", err);
     return null;
   }
 }
 
-/* ----------------------
-   ModalProvider Inner Component (wrapped in Suspense)
-   ---------------------- */
+type ProductContext = {
+  handle: string | null;
+  availableForSale?: boolean;
+} | null;
+
 function ModalProviderInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -133,6 +130,7 @@ function ModalProviderInner() {
   const [isOpen, setIsOpen] = useState(false);
   const [modalData, setModalData] = useState<SanityModal | null>(null);
   const [productData, setProductData] = useState<any | null>(null);
+  const [productCtx, setProductCtx] = useState<ProductContext>(null);
 
   const openModal = useCallback((modal: SanityModal, product?: any) => {
     setModalData(modal);
@@ -152,78 +150,129 @@ function ModalProviderInner() {
     setIsOpen(false);
   }, [modalData]);
 
+  // Listen & request product context (handshake)
+  useEffect(() => {
+    function onProductContext(ev: Event) {
+      const detail = (ev as CustomEvent).detail || {};
+      const next: ProductContext = {
+        handle: typeof detail.handle === "string" ? detail.handle : null,
+        availableForSale:
+          typeof detail.availableForSale === "boolean"
+            ? detail.availableForSale
+            : undefined,
+      };
+      setProductCtx(next);
+    }
+    window.addEventListener(
+      "preorder:product-context",
+      onProductContext as any
+    );
+    window.dispatchEvent(new Event("preorder:request-product-context"));
+    return () =>
+      window.removeEventListener(
+        "preorder:product-context",
+        onProductContext as any
+      );
+  }, []);
+
+  // Clear product context when leaving product detail routes
+  useEffect(() => {
+    const { routeIsProductPage } = detectPageInfo(pathname);
+    if (!routeIsProductPage) {
+      // Prevent listing/home pages from being treated as product pages due to stale context
+      setProductCtx(null);
+    }
+  }, [pathname]);
+
   useEffect(() => {
     let mounted = true;
     let delayTimer: ReturnType<typeof setTimeout> | null = null;
 
-    async function load() {
-      try {
-        const { slug, handle, isProductPage } = detectPageInfo(pathname);
-        const modal = await fetchModalForRoute({ slug, handle, isProductPage });
+    async function evaluate() {
+      const {
+        slug,
+        handle: routeHandle,
+        routeIsProductPage,
+      } = detectPageInfo(pathname);
 
-        if (!mounted) return;
-        if (!modal) {
-          setModalData(null);
-          setIsOpen(false);
-          return;
-        }
+      // Only treat current route as product page if it actually matches /product/<handle>
+      // (Product context handle is ignored for route classification now)
+      const effectiveHandle = routeHandle;
+      const effectiveIsProductPage = routeIsProductPage;
 
-        if (modal.showOncePerSession && hasModalSessionShown(modal)) {
-          setModalData(modal);
-          setIsOpen(false);
-          return;
-        }
+      const modal = await fetchModalForRoute({
+        slug,
+        handle: effectiveHandle,
+        routeIsProductPage: effectiveIsProductPage,
+      });
 
-        if (isModalDismissed(modal)) {
-          setModalData(modal);
-          setIsOpen(false);
-          return;
-        }
+      if (!mounted) return;
 
-        const eligible = isModalEligible({
-          modal,
-          slug,
-          productHandle: handle || null,
-          // product availability is unknown here; eligibility will not suppress unless required
-          productAvailable: undefined,
-        });
+      if (!modal) {
+        setModalData(null);
+        setIsOpen(false);
+        return;
+      }
 
-        if (!eligible) {
-          setModalData(modal);
-          setIsOpen(false);
-          return;
-        }
-
-        // Delay (toggle + unit + value)
-        const delayMs = modal?.enableDisplayDelay
-          ? (Number(modal.displayDelayValue) || 0) *
-            (modal.displayDelayUnit === "minutes" ? 60000 : 1000)
-          : 0;
-
+      if (modal.showOncePerSession && hasModalSessionShown(modal)) {
         setModalData(modal);
-        setProductData(null);
+        setIsOpen(false);
+        return;
+      }
 
-        if (delayTimer) clearTimeout(delayTimer);
+      if (isModalDismissed(modal)) {
+        setModalData(modal);
+        setIsOpen(false);
+        return;
+      }
 
-        if (delayMs > 0) {
-          delayTimer = setTimeout(() => {
-            if (!mounted) return;
-            setIsOpen(true);
-          }, delayMs);
-        } else {
+      // Use product availability only if on a product page
+      const productAvailable =
+        effectiveIsProductPage && productCtx
+          ? productCtx.availableForSale
+          : undefined;
+
+      const eligible = isModalEligible({
+        modal,
+        slug,
+        productHandle: effectiveIsProductPage ? effectiveHandle : null,
+        productAvailable,
+        routeIsProductPage: effectiveIsProductPage,
+      });
+
+      if (!eligible) {
+        setModalData(modal);
+        setIsOpen(false);
+        return;
+      }
+
+      const delayMs = modal?.enableDisplayDelay
+        ? (Number(modal.displayDelayValue) || 0) *
+          (modal.displayDelayUnit === "minutes" ? 60000 : 1000)
+        : 0;
+
+      setModalData(modal);
+      setProductData(null);
+
+      if (delayTimer) clearTimeout(delayTimer);
+
+      if (delayMs > 0) {
+        delayTimer = setTimeout(() => {
+          if (!mounted) return;
           setIsOpen(true);
-        }
-      } catch (err) {
-        console.error("ModalProvider load error:", err);
+        }, delayMs);
+      } else {
+        setIsOpen(true);
       }
     }
 
-    load();
+    evaluate();
+
     return () => {
       mounted = false;
       if (delayTimer) clearTimeout(delayTimer);
     };
-  }, [pathname, searchParams]);
+  }, [pathname, searchParams, productCtx]);
 
   return (
     <ModalContext.Provider value={{ openModal, closeModal, modalData, isOpen }}>
@@ -239,9 +288,6 @@ function ModalProviderInner() {
   );
 }
 
-/* ----------------------
-   Exported Provider (with Suspense wrapper)
-   ---------------------- */
 export function ModalProvider({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={null}>

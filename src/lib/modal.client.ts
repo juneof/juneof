@@ -30,22 +30,27 @@ function slugArrayIncludes(slugs: any[] | undefined, value: string) {
 }
 
 /**
- * Client-side eligibility check.
+ * Eligibility (OR targeting) with stricter product-page checks:
+ * - showOnAllProductPages: only if routeIsProductPage === true AND productHandle present
+ * - allowOnPreOrderProductPages: only if routeIsProductPage === true AND productHandle AND productAvailable === false
+ * - slugs: match if any slug variant matches current slug
+ * - showOnProductHandles list: match if productHandle in list
  *
- * - Matches by slugs OR showOnProductHandles OR allowOnPreOrderProductPages OR showOnAllProductPages.
- * - Only enforces startAt/endAt when enableSchedule === true.
- * - Optionally prevents showing for available products (only for pre-order targeting).
+ * routeIsProductPage prevents the "all product pages" or "pre-order product pages"
+ * toggles from leaking onto listing or non-product routes after navigation.
  */
 export function isModalEligible({
   modal,
   slug,
   productHandle,
   productAvailable,
+  routeIsProductPage,
 }: {
   modal: any | null;
   slug?: string | null;
   productHandle?: string | null;
   productAvailable?: boolean;
+  routeIsProductPage?: boolean;
 }) {
   if (!modal) return false;
 
@@ -54,28 +59,47 @@ export function isModalEligible({
     Array.isArray(modal.showOnProductHandles) &&
     modal.showOnProductHandles.length > 0;
 
-  // NEW: Global targeting for product pages
-  if (modal.showOnAllProductPages === true) {
-    // Must be on a product page (have a handle)
-    if (!productHandle) return false;
-    // Targeting satisfied, proceed to schedule checks below
-  } else if (hasSlugs) {
-    // slug match (covers homepage)
-    const variants = buildSlugVariants(slug || "");
+  let targetingMatched = false;
+
+  // 1. All product pages (must be real product route)
+  if (
+    modal.showOnAllProductPages === true &&
+    routeIsProductPage === true &&
+    productHandle
+  ) {
+    targetingMatched = true;
+  }
+
+  // 2. Pre-order product pages (must be real product route & product unavailable)
+  if (
+    modal.allowOnPreOrderProductPages === true &&
+    routeIsProductPage === true &&
+    productHandle &&
+    typeof productAvailable === "boolean" &&
+    productAvailable === false
+  ) {
+    targetingMatched = true;
+  }
+
+  // 3. Slug match (applies to any route including "/")
+  if (hasSlugs && slug) {
+    const variants = buildSlugVariants(slug);
     const matched = variants.some((v) =>
       slugArrayIncludes(modal.slugs, String(v))
     );
-    if (!matched) return false;
-  } else if (hasHandles) {
-    // handle match
-    if (!productHandle) return false;
-    if (!modal.showOnProductHandles.includes(productHandle)) return false;
-  } else {
-    // fallback: respect allowOnPreOrderProductPages flag
-    if (modal.allowOnPreOrderProductPages === false) return false;
+    if (matched) targetingMatched = true;
   }
 
-  // schedule: only when toggle is ON
+  // 4. Explicit product handles list (require actual product handle)
+  if (hasHandles && productHandle) {
+    if (modal.showOnProductHandles.includes(productHandle)) {
+      targetingMatched = true;
+    }
+  }
+
+  if (!targetingMatched) return false;
+
+  // Scheduling (only when enableSchedule === true)
   try {
     if (modal.enableSchedule === true) {
       const now = Date.now();
@@ -90,17 +114,6 @@ export function isModalEligible({
     }
   } catch (err) {
     console.warn("isModalEligible: schedule parse error", err);
-    return false;
-  }
-
-  // Only suppress available products when modal is explicitly pre-order targeted,
-  // not when it's configured for all product pages.
-  if (
-    modal.showOnAllProductPages !== true &&
-    modal.allowOnPreOrderProductPages === true &&
-    typeof productAvailable === "boolean" &&
-    productAvailable
-  ) {
     return false;
   }
 
@@ -141,7 +154,6 @@ export function isModalDismissed(modal: any) {
 
 /**
  * Session-based "show once per session" marker.
- * Uses `showOnceSessionKeySuffix` when provided, otherwise falls back to modal id.
  */
 export function hasModalSessionShown(modal: any) {
   if (!modal) return false;
