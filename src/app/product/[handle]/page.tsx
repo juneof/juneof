@@ -149,12 +149,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       preOrderModal, // note: Global provider handles showing; this remains available if needed
     };
 
-    console.log(
-      `Fetched product ${handle}`,
-      `WashCare: ${washCareGuide ? "✓" : "✗"}`,
-      `SizeGuide: ${sizeGuide ? "✓" : "✗"}`,
-      `Modal: ${preOrderModal ? "✓" : "✗"}`
-    );
+    console.log("Fetched product with guides and modal:", productWithGuides);
   } catch (error) {
     console.error("Failed to fetch product:", error);
     notFound();

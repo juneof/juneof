@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ProductCard from "../components/ProductCard";
-import { useProducts } from "@/context/ProductContext";
-import { ShopifyProductNode } from "@/lib/shopify";
+import { preloadShopifyProducts, ShopifyProductNode } from "@/lib/shopify";
 import { Loader2 } from "lucide-react";
 
 // Function to transform Shopify product data to ProductCard props
@@ -25,6 +24,8 @@ function transformShopifyProduct(product: ShopifyProductNode) {
   // Check if express interest is enabled for this product
   const expressInterest = product.metafield?.value === "true";
 
+  const preOrder = product?.preOrder || null;
+
   return {
     imageUrl: primaryImage,
     hoverImageUrl: hoverImage,
@@ -33,11 +34,11 @@ function transformShopifyProduct(product: ShopifyProductNode) {
     productUrl: `/product/${product.handle}`,
     currencyCode: currencyCode,
     expressInterest: expressInterest,
+    preOrder,
   };
 }
 
 export default function ProductListingClient() {
-  const { preloadedProducts, isProductsLoaded } = useProducts();
   const [displayProducts, setDisplayProducts] = useState<
     Array<{
       imageUrl: string;
@@ -47,21 +48,49 @@ export default function ProductListingClient() {
       productUrl: string;
       currencyCode: string;
       expressInterest: boolean;
+      preOrder?: {
+        value: string | null;
+        type: string;
+      } | null;
     }>
   >([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    if (isProductsLoaded && preloadedProducts.length > 0) {
-      // Use preloaded products if available
-      const transformedProducts = preloadedProducts.map(
-        transformShopifyProduct
-      );
-      setDisplayProducts(transformedProducts);
-    }
-  }, [isProductsLoaded, preloadedProducts]);
+    let mounted = true;
 
-  // Show loading spinner if products are not loaded yet
-  if (!isProductsLoaded) {
+    async function loadProducts() {
+      setIsLoading(true);
+      try {
+        // preloadShopifyProducts returns { products, imageUrls }
+        const result = await preloadShopifyProducts();
+        // result.products should be an array of ShopifyProductNode
+        if (!mounted) return;
+
+        const transformed = (result.products || []).map(
+          transformShopifyProduct
+        );
+        setDisplayProducts(transformed);
+      } catch (err) {
+        // keep UX simple: log error and show empty state
+        // (you can replace this with a toast or Sentry capture)
+        // eslint-disable-next-line no-console
+        console.error("Failed to load products (client):", err);
+        if (mounted) setDisplayProducts([]);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    }
+
+    loadProducts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Loading state
+  if (isLoading) {
     return (
       <main className="min-h-screen bg-[#F8F4EC] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -74,14 +103,13 @@ export default function ProductListingClient() {
     );
   }
 
-  // Show loading spinner if no products found (could be a configuration issue)
-  if (isProductsLoaded && preloadedProducts.length === 0) {
+  // Empty state when loaded but no products found
+  if (!isLoading && displayProducts.length === 0) {
     return (
       <main className="min-h-screen bg-[#F8F4EC] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-600" />
           <p className="text-gray-600 text-sm tracking-wider lowercase">
-            loading products...
+            no products found
           </p>
         </div>
       </main>
@@ -108,6 +136,7 @@ export default function ProductListingClient() {
             productUrl={product.productUrl}
             currencyCode={product.currencyCode}
             expressInterest={product.expressInterest}
+            preOrder={product.preOrder}
           />
         ))}
       </div>

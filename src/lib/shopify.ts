@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { GraphQLClient } from "graphql-request";
 
@@ -125,6 +126,10 @@ export const GET_FIRST_5_PRODUCTS_QUERY = gql`
             value
             type
           }
+          preOrder: metafield(namespace: "custom", key: "pre_order") {
+            value
+            type
+          }
         }
       }
     }
@@ -160,6 +165,10 @@ export const GET_LATEST_PRODUCTS_QUERY = gql`
             value
             type
           }
+          preOrder: metafield(namespace: "custom", key: "pre_order") {
+            value
+            type
+          }
         }
       }
     }
@@ -168,7 +177,7 @@ export const GET_LATEST_PRODUCTS_QUERY = gql`
 
 // --- New Query to get more products with multiple images for product listing ---
 export const GET_PRODUCTS_FOR_LISTING_QUERY = gql`
-  query GetProductsForListing($first: Int = 20) {
+  query GetProductsForListing($first: Int = 100) {
     products(first: $first) {
       edges {
         node {
@@ -193,6 +202,10 @@ export const GET_PRODUCTS_FOR_LISTING_QUERY = gql`
             }
           }
           metafield(namespace: "custom", key: "express_interest") {
+            value
+            type
+          }
+          preOrder: metafield(namespace: "custom", key: "pre_order") {
             value
             type
           }
@@ -262,6 +275,10 @@ export const GET_PRODUCT_BY_HANDLE_QUERY = gql`
       vendor
       productType
       metafield(namespace: "custom", key: "express_interest") {
+        value
+        type
+      }
+      preOrder: metafield(namespace: "custom", key: "pre_order") {
         value
         type
       }
@@ -683,6 +700,12 @@ export const GET_CART_QUERY = gql`
 
 // --- Define a basic type for the product data you expect from the query ---
 // This helps with TypeScript type safety.
+
+export interface ShopifyMetafield {
+  value: string | null;
+  type: string;
+}
+
 export interface ShopifyProductImage {
   url: string;
   altText: string | null;
@@ -710,10 +733,8 @@ export interface ShopifyProductNode {
       node: ShopifyProductImage;
     }[];
   };
-  metafield?: {
-    value: string | null;
-    type: string;
-  } | null;
+  metafield?: ShopifyMetafield | null;
+  preOrder?: ShopifyMetafield | null;
 }
 
 export interface ShopifyProductsData {
@@ -773,10 +794,8 @@ export interface ShopifyProductDetails {
   tags: string[];
   vendor: string;
   productType: string;
-  metafield?: {
-    value: string | null;
-    type: string;
-  } | null;
+  metafield?: ShopifyMetafield | null;
+  preOrder?: ShopifyMetafield | null;
 }
 
 export interface ShopifyProductByHandleData {
@@ -1228,7 +1247,7 @@ export async function preloadShopifyProducts(): Promise<{
   try {
     const data = await storefrontApiRequest<ShopifyProductsData>(
       GET_PRODUCTS_FOR_LISTING_QUERY,
-      { first: 20 } // Preload first 20 products
+      { first: 100 }
     );
 
     const products = data.products.edges.map((edge) => {

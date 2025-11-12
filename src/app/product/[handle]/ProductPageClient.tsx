@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -22,6 +23,7 @@ import {
   getSizeAvailabilityStatus,
   type ShopifyProductVariant,
 } from "@/lib/shopify";
+import { Badge } from "@/components/ui/badge";
 
 // Mobile detection hook
 const useIsMobile = () => {
@@ -86,6 +88,10 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
     product.metafield?.value === "true"
   );
 
+  const [isPreOrder, setIsPreOrder] = useState<boolean>(
+    product?.preOrder?.value === "true" ? true : false
+  );
+
   // Guards to prevent multiple cart overlay opens
   const hasOpenedCartFromUrl = useRef(false);
   const hasOpenedCartFromCompletion = useRef(false);
@@ -102,18 +108,19 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
   // Tell the GlobalModalProvider about this product's handle and availability
   useEffect(() => {
     if (!product?.handle) return;
-
-    console.info("[ProductPageClient] Dispatching product context:", {
-      handle: product.handle,
-      availableForSale: product.availableForSale,
-    });
+    if (product?.preOrder?.value === "true") {
+      setIsPreOrder(true);
+    } else {
+      setIsPreOrder(false);
+      return;
+    }
 
     // Send immediately on mount/update
     window.dispatchEvent(
       new CustomEvent("preorder:product-context", {
         detail: {
           handle: product.handle,
-          availableForSale: Boolean(product.availableForSale),
+          availableForSale: Boolean(!isPreOrder),
         },
       })
     );
@@ -124,7 +131,7 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
         new CustomEvent("preorder:product-context", {
           detail: {
             handle: product.handle,
-            availableForSale: Boolean(product.availableForSale),
+            availableForSale: Boolean(!isPreOrder),
           },
         })
       );
@@ -132,7 +139,7 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
     window.addEventListener("preorder:request-product-context", onRequest);
     return () =>
       window.removeEventListener("preorder:request-product-context", onRequest);
-  }, [product?.handle, product?.availableForSale]);
+  }, [product?.handle, product?.preOrder]);
 
   // NEW: Initialize available sizes from Shopify variants
   useEffect(() => {
@@ -156,7 +163,6 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
     if (product && selectedSize) {
       const variant = findVariantBySize(product, selectedSize);
       setSelectedVariant(variant);
-      console.log("Selected variant:", variant);
     }
   }, [product, selectedSize]);
 
@@ -572,9 +578,16 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
           <div className="p-4 space-y-6">
             {/* Product Title and Price - Now below images */}
             <div className="space-y-2">
-              <h1 className="text-lg font-medium tracking-widest lowercase">
-                {product.title.toLowerCase()}
-              </h1>
+              <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
+                <h1 className="text-lg font-medium tracking-widest lowercase">
+                  {product.title.toLowerCase()}
+                </h1>
+                {isPreOrder && (
+                  <Badge className="h-5 min-w-5 rounded-[4px] px-2 font-mono tabular-nums text-base">
+                    pre-order
+                  </Badge>
+                )}
+              </div>
               {!expressInterest && (
                 <span className="text-lg font-medium">
                   {formatPrice(price, currencyCode)}
@@ -673,6 +686,7 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
           </div>
 
           {/* Sticky Add to Cart - Mobile */}
+
           <div className="sticky bottom-0 bg-[#F8F4EC] border-t border-gray-300 p-4">
             <button
               className="w-full border border-gray-900 py-4 text-center text-base tracking-widest hover:bg-gray-100 transition-colors lowercase disabled:opacity-50 disabled:cursor-not-allowed"
@@ -773,9 +787,16 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
         <div className="sticky top-20 flex h-screen w-1/4 flex-col p-8">
           {/* Main content centered */}
           <div className="flex-1 flex flex-col justify-center space-y-4">
-            <h1 className="text-2xl font-medium tracking-widest lowercase">
-              {product.title.toLowerCase()}
-            </h1>
+            <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
+              <h1 className="text-2xl font-medium tracking-widest lowercase">
+                {product.title.toLowerCase()}
+              </h1>
+              {isPreOrder && (
+                <Badge className="h-5 min-w-5 rounded-[4px] px-2 font-mono tabular-nums text-base">
+                  pre-order
+                </Badge>
+              )}
+            </div>
 
             {/* Product Description - Always Visible */}
             <div
@@ -917,7 +938,6 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
 
           {/* Add to Cart Button */}
           <div className="mt-auto">
-            {/* Express Interest Banner - positioned above button */}
             {currentExpressInterest && (
               <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg mb-4">
                 <p className="text-sm text-gray-700 tracking-wide lowercase leading-relaxed text-justify">

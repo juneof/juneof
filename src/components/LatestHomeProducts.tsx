@@ -25,6 +25,8 @@ function transformShopifyProduct(product: ShopifyProductNode) {
 
   const expressInterest = product.metafield?.value === "true";
 
+  const preOrder = product?.preOrder || null;
+
   return {
     imageUrl: primaryImage,
     hoverImageUrl: hoverImage,
@@ -33,6 +35,7 @@ function transformShopifyProduct(product: ShopifyProductNode) {
     productUrl: `/product/${product.handle}`,
     currencyCode,
     expressInterest,
+    preOrder,
   };
 }
 
@@ -46,6 +49,10 @@ const LatestHomeProducts: React.FC = () => {
       productUrl: string;
       currencyCode: string;
       expressInterest: boolean;
+      preOrder?: {
+        value: string | null;
+        type: string;
+      } | null;
     }>
   >([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,6 +86,8 @@ const LatestHomeProducts: React.FC = () => {
       mounted = false;
     };
   }, []);
+
+  console.log("LatestHomeProducts - displayProducts:", displayProducts);
 
   if (isLoading) {
     return (
@@ -126,6 +135,7 @@ const LatestHomeProducts: React.FC = () => {
             productUrl={product.productUrl}
             currencyCode={product.currencyCode}
             expressInterest={product.expressInterest}
+            preOrder={product.preOrder}
           />
         ))}
       </div>

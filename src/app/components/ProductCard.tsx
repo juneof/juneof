@@ -44,6 +44,10 @@ interface ProductCardProps {
   productUrl: string;
   currencyCode?: string; // Optional currency code from Shopify
   expressInterest?: boolean; // Whether to show "coming soon!" banner
+  preOrder?: {
+    value: string | null;
+    type: string;
+  } | null; // Optional pre-order information
 }
 
 // Enhanced price formatter that handles different currencies
@@ -82,6 +86,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   productUrl,
   currencyCode,
   expressInterest = false,
+  preOrder,
 }) => {
   const cardRef = useRef<HTMLAnchorElement>(null);
   const defaultImageRef = useRef<HTMLDivElement>(null);
@@ -167,9 +172,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
           />
         </div>
       </div>
-      <h3 className="text-lg text-gray-900 lowercase font-medium tracking-widest mb-2">
-        {name}
-      </h3>
+      <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
+        <h3 className="text-lg text-gray-900 lowercase font-medium tracking-widest">
+          {name}
+        </h3>
+        {preOrder?.value === "true" && (
+          <Badge className="h-5 min-w-5 rounded-[4px] px-2 font-mono tabular-nums text-base">
+            pre-order
+          </Badge>
+        )}
+      </div>
       {expressInterest ? (
         <Badge className="bg-black text-white hover:bg-black/90 px-4 py-2 text-sm font-semibold tracking-widest lowercase border-0">
           coming soon!
