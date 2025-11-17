@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react/display-name */
 import React from "react";
 import type { SanityImageSource } from "@sanity/image-url/lib/types/types";
