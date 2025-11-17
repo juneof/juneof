@@ -23,12 +23,11 @@ const HomePageSection2 = React.forwardRef<HTMLDivElement, Props>(
             height={1200}
             priority
             sizes="(max-width: 768px) 80vw, 55vw"
+            className="max-h-[622px]"
             onLoad={() => handleImageLoad(getImageUrl(pageData.sticky_image))}
           />
-        </div>
-        <div>
-          <h1 className="text-3xl font-normal m-0 leading-tight lowercase tracking-widest">
-            a playful homage to the creative depth of India
+          <h1 className="text-3xl md:text-[42px] font-normal m-0 leading-tight">
+            A playful homage to the creative depth of india
           </h1>
         </div>
       </div>
