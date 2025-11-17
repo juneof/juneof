@@ -67,7 +67,7 @@
   display: block;
   left: 0;
   width: 100vw !important;
-  height: 200vh;
+  height: 300vh;
   max-width: none !important;
 }
 
@@ -79,16 +79,24 @@
   background: var(--custom-white);
   max-width: none !important;
   left: 0 !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 150px 50px;
 }
 
 .section2 .container img {
   min-width: 600px;
   width: 55vw;
+  height: 60vh;
   max-width: 1800px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  position: static;
+  object-fit: cover;
+}
+
+.section2 .container h1 {
+  margin-top: 40px;
+  align-self: flex-end;
 }
 
 /* Section 3 - Manifesto */

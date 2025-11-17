@@ -39,7 +39,13 @@ function transformShopifyProduct(product: ShopifyProductNode) {
   };
 }
 
-const LatestHomeProducts: React.FC = () => {
+interface LatestHomeProductsProps {
+  onContentReady?: () => void;
+}
+
+const LatestHomeProducts: React.FC<LatestHomeProductsProps> = ({
+  onContentReady,
+}) => {
   const [displayProducts, setDisplayProducts] = useState<
     Array<{
       imageUrl: string;
@@ -86,6 +92,16 @@ const LatestHomeProducts: React.FC = () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isLoading && onContentReady) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          onContentReady();
+        });
+      });
+    }
+  }, [isLoading, onContentReady]);
 
   console.log("LatestHomeProducts - displayProducts:", displayProducts);
 

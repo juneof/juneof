@@ -69,6 +69,12 @@ export default function LandingPageContent() {
   const loadedImagesRef = useRef(new Set<string>());
   const animationsInitializedRef = useRef(false);
 
+  const [productsReady, setProductsReady] = useState(false);
+
+  const handleProductsReady = useCallback(() => {
+    setProductsReady(true);
+  }, []);
+
   // Fetch data
   useEffect(() => {
     const fetchData = async () => {
@@ -87,7 +93,7 @@ export default function LandingPageContent() {
   // image load tracker
   const handleImageLoad = useCallback((src: string) => {
     loadedImagesRef.current.add(src);
-    if (loadedImagesRef.current.size >= 6) {
+    if (loadedImagesRef.current.size >= 5) {
       setImagesLoaded(true);
     }
   }, []);
@@ -223,25 +229,8 @@ export default function LandingPageContent() {
         });
       }
 
-      // Section 3 parallax
-      const section3Image = document.querySelector(
-        ".section3 .container img"
-      ) as HTMLImageElement | null;
-      if (section3Image?.offsetHeight) {
-        gsap.to(".section3 .container img", {
-          scrollTrigger: {
-            trigger: ".section3 .container",
-            start: "top bottom",
-            end: "bottom top",
-            scrub: true,
-            markers: false,
-          },
-          y: () => `+=${0.3 * section3Image.offsetHeight}`,
-        });
-      }
-
       // Position Section 4
-      const section3length = section3Ref.current?.offsetHeight || 0;
+      const section3length = section3Ref.current?.scrollHeight || 0;
       if (section4Ref.current) {
         section4Ref.current.style.top = `${section1length + section3length}px`;
       }
@@ -290,6 +279,47 @@ export default function LandingPageContent() {
       }, 500);
     }
   }, [ensureDOMReady, validateDimensions, dimensions, isMobile, pageData]);
+
+  useEffect(() => {
+    if (productsReady && animationsInitializedRef.current) {
+      console.log("Products ready, recalculating Section 3 height...");
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const section1length = section1Ref.current?.offsetHeight || 0;
+
+            const section3length = section3Ref.current?.scrollHeight || 0;
+
+            console.log("Section 1 length:", section1length);
+            console.log("Section 3 length (scrollHeight):", section3length);
+
+            if (section4Ref.current && section3length > 0) {
+              const newTop = section1length + section3length;
+              console.log("Setting Section 4 top to:", newTop);
+              section4Ref.current.style.top = `${newTop}px`;
+            }
+
+            const section4length = section4Ref.current?.offsetHeight || 0;
+            const height = dimensions.height;
+
+            if (spacerRef.current) {
+              const spacerHeight =
+                section1length +
+                section3length +
+                section4length +
+                height * 0.0001;
+              console.log("Setting spacer height to:", spacerHeight);
+              spacerRef.current.style.height = `${spacerHeight}px`;
+            }
+
+            ScrollTrigger.refresh();
+            console.log("Layout recalculated and ScrollTrigger refreshed");
+          });
+        });
+      });
+    }
+  }, [productsReady, dimensions]);
 
   // hydration
   useEffect(() => {
@@ -385,6 +415,7 @@ export default function LandingPageContent() {
         ref={section3Ref}
         pageData={pageData}
         handleImageLoad={handleImageLoad}
+        onProductsReady={handleProductsReady}
       />
       <HomePageSection4
         ref={section4Ref}

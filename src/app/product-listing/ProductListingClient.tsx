@@ -74,7 +74,6 @@ export default function ProductListingClient() {
       } catch (err) {
         // keep UX simple: log error and show empty state
         // (you can replace this with a toast or Sentry capture)
-        // eslint-disable-next-line no-console
         console.error("Failed to load products (client):", err);
         if (mounted) setDisplayProducts([]);
       } finally {
