@@ -105,41 +105,47 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
 
   const searchParams = useSearchParams();
 
+  const hasShownPreorderPopupRef = useRef(false);
+
   // Tell the GlobalModalProvider about this product's handle and availability
   useEffect(() => {
     if (!product?.handle) return;
-    if (product?.preOrder?.value === "true") {
-      setIsPreOrder(true);
-    } else {
-      setIsPreOrder(false);
-      return;
+
+    const preOrderIsTrue = product?.preOrder?.value === "true";
+    setIsPreOrder(preOrderIsTrue);
+
+    const availableForSale = !preOrderIsTrue;
+
+    // Only show popup on first page load
+    if (!hasShownPreorderPopupRef.current) {
+      window.dispatchEvent(
+        new CustomEvent("preorder:product-context", {
+          detail: {
+            handle: product.handle,
+            availableForSale,
+          },
+        })
+      );
+
+      hasShownPreorderPopupRef.current = true;
     }
 
-    // Send immediately on mount/update
-    window.dispatchEvent(
-      new CustomEvent("preorder:product-context", {
-        detail: {
-          handle: product.handle,
-          availableForSale: Boolean(!isPreOrder),
-        },
-      })
-    );
-
-    // Respond to provider handshake requests
+    // For provider handshake (safe)
     function onRequest() {
       window.dispatchEvent(
         new CustomEvent("preorder:product-context", {
           detail: {
             handle: product.handle,
-            availableForSale: Boolean(!isPreOrder),
+            availableForSale,
           },
         })
       );
     }
+
     window.addEventListener("preorder:request-product-context", onRequest);
     return () =>
       window.removeEventListener("preorder:request-product-context", onRequest);
-  }, [product?.handle, product?.preOrder]);
+  }, [product?.handle, product?.preOrder?.value]);
 
   // NEW: Initialize available sizes from Shopify variants
   useEffect(() => {
