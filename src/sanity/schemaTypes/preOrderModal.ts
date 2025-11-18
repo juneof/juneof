@@ -12,7 +12,7 @@ export const preOrderModal = defineType({
     enabled: true,
     allowOnPreOrderProductPages: false,
     showOnAllProductPages: false,
-    showOncePerSession: false,
+    showOncePerSession: true,
     enableDisplayDelay: false,
     displayDelayUnit: "seconds",
     displayDelayValue: 0,
