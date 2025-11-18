@@ -1,6 +1,6 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable react-hooks/rules-of-hooks */
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
@@ -29,6 +29,8 @@ interface PreOrderModalProps {
     availableForSale?: boolean;
   };
   modalDetails?: any;
+  // optional route-scoped key passed from ModalContext
+  modalScope?: string | undefined;
 }
 
 const builder = imageUrlBuilder(sanityClient);
@@ -69,12 +71,17 @@ export default function PreOrderModal({
   onClose,
   product,
   modalDetails,
+  modalScope,
 }: PreOrderModalProps) {
+  // --- basic state/hooks (always declared, never conditionally)
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // state to decide whether to actually render modal content (keeps hooks stable)
+  const [shouldShow, setShouldShow] = useState(true);
 
   // mount guard
   useEffect(() => setMounted(true), []);
@@ -106,19 +113,31 @@ export default function PreOrderModal({
     };
   }, [isOpen, mounted]);
 
-  // Defensive: if no modalDetails, don't render (matches original)
-  if (!modalDetails) return null;
-
-  // Prevent re-showing in same session
-  if (typeof window !== "undefined" && modalDetails?.showOncePerSession) {
-    try {
-      if (hasModalSessionShown(modalDetails)) return null;
-    } catch {
-      // ignore
+  // determine shouldShow based on modalDetails and session flags (route-scoped)
+  useEffect(() => {
+    // default: if no modalDetails, don't show
+    if (!modalDetails) {
+      setShouldShow(false);
+      return;
     }
-  }
 
-  // derive modal fields once
+    // If modalDetails exists, check showOncePerSession flag using route scope
+    if (modalDetails?.showOncePerSession) {
+      try {
+        if (hasModalSessionShown(modalDetails, modalScope ?? null)) {
+          setShouldShow(false);
+          return;
+        }
+      } catch {
+        // fail safe -> allow showing
+      }
+    }
+
+    // otherwise allow show
+    setShouldShow(true);
+  }, [modalDetails, modalScope]);
+
+  // derive modal fields once (safe to run even if modalDetails is null)
   const {
     heading,
     subHeading,
@@ -196,7 +215,6 @@ export default function PreOrderModal({
       bgImageUrl: bgImg,
       overlayOpacity: overlay,
     };
-    // note: intentionally omit modalDetails from deps to keep stable; we only read it initially
   }, [modalDetails, isMobile]);
 
   const discountBlock =
@@ -208,7 +226,7 @@ export default function PreOrderModal({
 
   const markSessionShownSafe = () => {
     try {
-      markModalSessionShown(modalDetails);
+      if (modalDetails) markModalSessionShown(modalDetails, modalScope ?? null);
     } catch {}
   };
 
@@ -224,8 +242,7 @@ export default function PreOrderModal({
         handleClose();
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isOpen]
+    [isOpen] // include isOpen so closure sees latest
   );
 
   useEffect(() => {
@@ -291,7 +308,7 @@ export default function PreOrderModal({
       setEmail("");
       setEmailError(null);
       try {
-        persistModalDismiss(modalDetails);
+        if (modalDetails) persistModalDismiss(modalDetails);
       } catch {}
       markSessionShownSafe();
       onClose();
@@ -303,8 +320,11 @@ export default function PreOrderModal({
     }
   };
 
+  // --- Final render gating:
+  // Keep these returns AFTER all hooks to maintain hook order stability.
   if (!mounted) return null;
   if (!isOpen) return null;
+  if (!shouldShow) return null;
 
   const modal = (
     <div

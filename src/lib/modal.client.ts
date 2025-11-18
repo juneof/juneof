@@ -153,17 +153,47 @@ export function isModalDismissed(modal: any) {
 }
 
 /**
- * Session-based "show once per session" marker.
+ * Derive a stable-ish suffix for a modal (try explicit, then id, name, slug).
  */
-export function hasModalSessionShown(modal: any) {
+function _deriveSessionSuffix(modal: any) {
+  if (!modal) return "preorder_global";
+  if (
+    modal.showOnceSessionKeySuffix &&
+    typeof modal.showOnceSessionKeySuffix === "string"
+  ) {
+    return String(modal.showOnceSessionKeySuffix);
+  }
+  if (modal._id) return String(modal._id);
+  if (modal.modalName) return String(modal.modalName);
+  if (Array.isArray(modal.slugs) && modal.slugs.length > 0) {
+    const s = modal.slugs.find((x: any) => typeof x === "string");
+    if (s) return String(s).replace(/^\/+|\/+$/g, "");
+  }
+  return "preorder_global";
+}
+
+/**
+ * Build storage key for "session shown" state.
+ * If a scope is provided (e.g. page slug), it is appended so the key is scoped to a route.
+ */
+function _sessionKeyFor(modal: any, scope?: string | null) {
+  const suffix = _deriveSessionSuffix(modal);
+  const scopePart =
+    typeof scope === "string" && scope.trim() !== ""
+      ? `::${scope.replace(/^\/+|\/+$/g, "")}`
+      : "::global";
+  return `preorder_modal_session_shown_${suffix}${scopePart}`;
+}
+
+/**
+ * Session-based "show once per session" marker (route-scoped).
+ *
+ * Usage: hasModalSessionShown(modal, slug)
+ */
+export function hasModalSessionShown(modal: any, scope?: string | null) {
   if (!modal) return false;
   if (!modal.showOncePerSession) return false;
-  const suffix =
-    modal.showOnceSessionKeySuffix ||
-    modal._id ||
-    modal.id ||
-    "preorder_global";
-  const key = `preorder_modal_session_shown_${suffix}`;
+  const key = _sessionKeyFor(modal, scope);
   try {
     return sessionStorage.getItem(key) !== null;
   } catch {
@@ -171,16 +201,11 @@ export function hasModalSessionShown(modal: any) {
   }
 }
 
-/** Mark modal as shown for the current session. */
-export function markModalSessionShown(modal: any) {
+/** Mark modal as shown for the current session (route-scoped). */
+export function markModalSessionShown(modal: any, scope?: string | null) {
   if (!modal) return;
   if (!modal.showOncePerSession) return;
-  const suffix =
-    modal.showOnceSessionKeySuffix ||
-    modal._id ||
-    modal.id ||
-    "preorder_global";
-  const key = `preorder_modal_session_shown_${suffix}`;
+  const key = _sessionKeyFor(modal, scope);
   try {
     sessionStorage.setItem(key, "1");
   } catch {

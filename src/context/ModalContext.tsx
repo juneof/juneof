@@ -132,6 +132,9 @@ function ModalProviderInner() {
   const [productData, setProductData] = useState<any | null>(null);
   const [productCtx, setProductCtx] = useState<ProductContext>(null);
 
+  // current route slug (normalized) used as modalScope for session keys
+  const [currentSlug, setCurrentSlug] = useState<string | null>(null);
+
   const openModal = useCallback((modal: SanityModal, product?: any) => {
     setModalData(modal);
     setProductData(product || null);
@@ -144,11 +147,14 @@ function ModalProviderInner() {
         persistModalDismiss(modalData);
       } catch {}
       try {
-        if (modalData.showOncePerSession) markModalSessionShown(modalData);
+        // prefer the currentSlug, fallback to slug derived from pathname
+        const slugToUse = currentSlug ?? detectPageInfo(pathname).slug;
+        if (modalData.showOncePerSession)
+          markModalSessionShown(modalData, slugToUse);
       } catch {}
     }
     setIsOpen(false);
-  }, [modalData]);
+  }, [modalData, currentSlug, pathname]);
 
   // Listen & request product context (handshake)
   useEffect(() => {
@@ -195,8 +201,10 @@ function ModalProviderInner() {
         routeIsProductPage,
       } = detectPageInfo(pathname);
 
+      // set the current slug for session scoping and other uses
+      setCurrentSlug(slug);
+
       // Only treat current route as product page if it actually matches /product/<handle>
-      // (Product context handle is ignored for route classification now)
       const effectiveHandle = routeHandle;
       const effectiveIsProductPage = routeIsProductPage;
 
@@ -214,7 +222,8 @@ function ModalProviderInner() {
         return;
       }
 
-      if (modal.showOncePerSession && hasModalSessionShown(modal)) {
+      // Check session-scoped "shown" flag for this slug
+      if (modal.showOncePerSession && hasModalSessionShown(modal, slug)) {
         setModalData(modal);
         setIsOpen(false);
         return;
@@ -276,14 +285,20 @@ function ModalProviderInner() {
 
   return (
     <ModalContext.Provider value={{ openModal, closeModal, modalData, isOpen }}>
-      {modalData && (
-        <PreOrderModal
-          isOpen={isOpen}
-          onClose={closeModal}
-          product={productData || undefined}
-          modalDetails={modalData}
-        />
-      )}
+      {/* Always render PreOrderModal to keep hook order stable.
+          Visibility controlled by isOpen and modalData presence.
+          Pass modalScope so session marking is route-scoped. */}
+      <PreOrderModal
+        isOpen={Boolean(isOpen && modalData)}
+        onClose={closeModal}
+        product={productData || undefined}
+        modalDetails={modalData}
+        // pass normalized slug as modalScope (or undefined)
+        // PreOrderModal should pass this into markModalSessionShown when marking shown.
+        modalScope={currentSlug || undefined}
+      />
+
+      {/* children are rendered by ModalProvider wrapper */}
     </ModalContext.Provider>
   );
 }
